@@ -40,6 +40,7 @@
 #include <pp_AttrProp.h>
 #include <gsf/gsf-output-memory.h>
 #include <ut_units.h>
+#include <ut_conversion.h>
 #include <fl_TOCLayout.h>
 #include <pd_DocumentRDF.h>
 #include "pp_Revision.h"
@@ -189,14 +190,6 @@ void ODe_Text_Listener::closeBlock() {
 }
 
 
-template < typename T >
-static std::string tostr( T v )
-{
-    std::stringstream ss;
-    ss << v;
-    return ss.str();
-}
- 
 class ODFChangeTrackerIdFactory
 {
     std::string m_prefix;

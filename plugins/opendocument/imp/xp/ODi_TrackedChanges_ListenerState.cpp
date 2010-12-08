@@ -40,6 +40,7 @@
 
 // AbiWord includes
 #include <ut_misc.h>
+#include <ut_conversion.h>
 #include <pd_Document.h>
 #include <pf_Frag_Strux.h>
 #include "xad_Document.h"
@@ -48,33 +49,6 @@
 
 #include <sstream>
 
-static std::string UT_getAttributeString( const char* name, const gchar** pAttrs, const char* defaultValue = "" )
-{
-    const gchar* p = UT_getAttribute ( name, pAttrs );
-    std::string ret = defaultValue;
-    if( p )
-        ret = p;
-    return ret;
-}
-
-template < typename ClassName >
-static ClassName toType( const char* s )
-{
-    UT_uint32 ret = 0;
-    std::stringstream ss;
-    ss << s;
-    ss >> ret;
-    return ret;
-}
-template < typename ClassName >
-static ClassName toType( std::string s )
-{
-    UT_uint32 ret = 0;
-    std::stringstream ss;
-    ss << s;
-    ss >> ret;
-    return ret;
-}
 
 /**
  * Constructor
@@ -121,10 +95,10 @@ void ODi_TrackedChanges_ListenerState::startElement ( const gchar* pName,
 {
     if (!strcmp(pName, "delta:tracked-changes" )) {
 
-        int showRevisions   = toType<int>(UT_getAttributeString("delta:showing-revisions", ppAtts, "1" ));
-        int markRevisions   = toType<int>(UT_getAttributeString("delta:mark-revisions",    ppAtts, "1" ));
-        int autoRevisioning = toType<int>(UT_getAttributeString("delta:auto-revisioning",  ppAtts, "0" ));
-        UT_uint32 currRevision = toType<UT_uint32>(UT_getAttributeString("delta:current-revision",  ppAtts, "-1" ));
+        int showRevisions   = toType<int>(UT_getAttribute("delta:showing-revisions", ppAtts, "1" ));
+        int markRevisions   = toType<int>(UT_getAttribute("delta:mark-revisions",    ppAtts, "1" ));
+        int autoRevisioning = toType<int>(UT_getAttribute("delta:auto-revisioning",  ppAtts, "0" ));
+        UT_uint32 currRevision = toType<UT_uint32>(UT_getAttribute("delta:current-revision",  ppAtts, "-1" ));
 
         UT_DEBUGMSG(("tc, delta:tracked-changes show-rev:%d mark:%d curr:%d\n",
                      showRevisions, markRevisions, currRevision ));
@@ -139,7 +113,7 @@ void ODi_TrackedChanges_ListenerState::startElement ( const gchar* pName,
         
     } else if (!strcmp(pName, "delta:change-transaction" )) {
 
-        m_ctCurrentTransactionID = toType<UT_uint32>(UT_getAttributeString("delta:change-id", ppAtts, "-1" ));
+        m_ctCurrentTransactionID = toType<UT_uint32>(UT_getAttribute("delta:change-id", ppAtts, "-1" ));
         if( m_ctCurrentTransactionID == -1 )
         {
             // error

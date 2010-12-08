@@ -43,45 +43,14 @@
 
 // AbiWord includes
 #include <ut_misc.h>
+#include <ut_conversion.h>
 #include <pd_Document.h>
 #include <pf_Frag_Strux.h>
 
 #include <sstream>
 #include <list>
 
-
-static std::string UT_getAttributeString( const char* name, const gchar** pAttrs, const char* defaultValue = "" )
-{
-    const gchar* p = UT_getAttribute ( name, pAttrs );
-    std::string ret = defaultValue;
-    if( p )
-        ret = p;
-    return ret;
-}
-
-template < typename ClassName >
-static ClassName toType( const char* s )
-{
-    UT_uint32 ret = 0;
-    std::stringstream ss;
-    ss << s;
-    ss >> ret;
-    return ret;
-}
-
-template < typename ClassName >
-static ClassName toType( std::string s )
-{
-    UT_uint32 ret = 0;
-    std::stringstream ss;
-    ss << s;
-    ss >> ret;
-    return ret;
-}
-
-
-
-
+#include <boost/array.hpp>
 
 /************************************************************/
 /************************************************************/
@@ -147,6 +116,76 @@ ODi_TextContent_ListenerState::~ODi_TextContent_ListenerState()
     }
 }
 
+/**
+ * As at 2010 there are many pieces of code that declare an array of
+ * char* on the stack to set 2-10 parameters and pass this char** to a
+ * function to use. It is ugly and somewhat error prone to maintain
+ * the index into this array manually and also if code happens to
+ * overrun the array there is no error detection for that. By using
+ * boost::array at least these out of bounds cases can be cought and
+ * code does not have to worry about NULL terminating the array
+ * itself. The array is allocated as part of the object on the stack
+ * though so we avoid memory allocation and zeroing issues along with
+ * possible fragmentation over time. Note that the [i++] style should
+ * also work with propertyArray, and count() gives you the index of
+ * the first NULL value in the array.
+ *
+ * Example usage:
+ * propertyArray<> ppAtts;
+ * ppAtts.push_back( PT_REVISION_ATTRIBUTE_NAME );
+ * ppAtts.push_back( "foo" );
+ * ppAtts.push_back( 0 );    // optional
+ * somethingThatWantsArrayOfCharPointers(ppAtts.data());
+ * and the array goes away here.
+ *
+ * Another way to say it is shown below, but push_back() seems cleaner.
+ * propertyArray<> ppAtts;
+ * ppAtts[ppAtts.count()] = PT_REVISION_ATTRIBUTE_NAME;
+ * ppAtts[ppAtts.count()] = "foo";
+ * somethingThatWantsArrayOfCharPointers(ppAtts.data());
+ *
+ * This replaces the style below, note that the code is similar,
+ * though the explicit index "i" is not needed above.
+ * 
+ * const gchar* ppAtts[10];
+ * bzero(ppAtts, 10 * sizeof(gchar*));
+ * int i=0;
+ * ppAtts[i++] = PT_REVISION_ATTRIBUTE_NAME;
+ * ppAtts[i++] = "foo";
+ * ppAtts[i++] = 0;
+ * somethingThatWantsArrayOfCharPointers(ppAtts);
+ * 
+ */
+template< std::size_t N = 32 >
+class propertyArray
+    :
+    public boost::array< const gchar*, N > 
+{
+public:
+    propertyArray()
+    {
+        this->assign( 0 );
+    }
+    
+    void push_back( const gchar* v )
+    {
+        std::size_t sz = count();
+        this->at(sz) = v;
+    }
+
+    std::size_t count() const
+    {
+        for( std::size_t i = 0; i < this->size(); i++ )
+        {
+            if( this->at(i) == 0 )
+                return i;
+        }
+        return 0;
+    }
+    
+};
+
+
 
 /**
  * Called when the XML parser finds a start element tag.
@@ -209,7 +248,7 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
 
     } else if (!strcmp(pName, "delta:removed-content" )) {
 
-        std::string idref = UT_getAttributeString("delta:removal-change-idref", ppAtts);
+        std::string idref = UT_getAttribute("delta:removal-change-idref", ppAtts, "");
         m_ctParagraphDeletedRevision = toType<UT_uint32>(idref);
         UT_DEBUGMSG(("DELETE paraRevision:%s\n", idref.c_str() ));
 
@@ -339,8 +378,8 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
 
         _flush ();
 
-        std::string ctTextID = UT_getAttributeString("delta:removed-text-id", ppAtts);
-        std::string idref    = UT_getAttributeString("delta:removal-change-idref", ppAtts);
+        std::string ctTextID = UT_getAttribute("delta:removed-text-id", ppAtts, "" );
+        std::string idref    = UT_getAttribute("delta:removal-change-idref", ppAtts, "" );
         PP_RevisionAttr ctRevision;
         
         UT_DEBUGMSG(("delta:removed-content-start tid:%s idref:%s\n", ctTextID.c_str(), idref.c_str()));
@@ -361,19 +400,30 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
 
         if( strlen(ctRevision.getXMLstring()) )
         {
-            if( strcmp(ctRevision.getXMLstring(),"0"))
+            if( strcmp( ctRevision.getXMLstring(), "0" ))
             {
                 UT_DEBUGMSG(("delta:revision:%s\n", ctRevision.getXMLstring()));
-                const gchar* ppAtts[10];
-                bzero(ppAtts, 10 * sizeof(gchar*));
-                int i=0;
-                ppAtts[i++] = PT_REVISION_ATTRIBUTE_NAME;
-                ppAtts[i++] = ctRevision.getXMLstring();
-                ppAtts[i++] = 0;
-                _pushInlineFmt(ppAtts);
+
+                propertyArray<> ppAtts;
+                ppAtts.push_back( PT_REVISION_ATTRIBUTE_NAME );
+                ppAtts.push_back( ctRevision.getXMLstring() );
+                ppAtts.push_back( 0 );
+                _pushInlineFmt(ppAtts.data());
                 bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
                 UT_ASSERT(ok);
                 m_ctSpanDepth++;
+                
+                
+                // const gchar* ppAtts[10];
+                // bzero(ppAtts, 10 * sizeof(gchar*));
+                // int i=0;
+                // ppAtts[i++] = PT_REVISION_ATTRIBUTE_NAME;
+                // ppAtts[i++] = ctRevision.getXMLstring();
+                // ppAtts[i++] = 0;
+                // _pushInlineFmt(ppAtts);
+                // bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
+                // UT_ASSERT(ok);
+                // m_ctSpanDepth++;
             }
         }
 
@@ -414,8 +464,8 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
 
         _flush ();
         
-        std::string ctTextID = UT_getAttributeString("delta:inserted-text-id", ppAtts);
-        std::string idref    = UT_getAttributeString("delta:insertion-change-idref", ppAtts);
+        std::string ctTextID = UT_getAttribute("delta:inserted-text-id", ppAtts, "" );
+        std::string idref    = UT_getAttribute("delta:insertion-change-idref", ppAtts, "" );
         PP_RevisionAttr ctRevision;
 
         m_ctMostRecentWritingVersion = idref;
@@ -1764,8 +1814,9 @@ void ODi_TextContent_ListenerState::_startParagraphElement (const gchar* /*pName
         xmlid = UT_getAttribute ("xml:id", ppParagraphAtts);
 
         // ODT Change Tracking
-        std::string ctInsertionType        = UT_getAttributeString("delta:insertion-type", ppParagraphAtts);
-        std::string ctInsertionChangeIDRef = UT_getAttributeString("delta:insertion-change-idref", ppParagraphAtts);
+        std::string ctInsertionType        = UT_getAttribute("delta:insertion-type", ppParagraphAtts, "" );
+        std::string ctInsertionChangeIDRef = UT_getAttribute("delta:insertion-change-idref",
+                                                             ppParagraphAtts, "" );
         PP_RevisionAttr ctRevision;
 
         // DEBUG BLOCK

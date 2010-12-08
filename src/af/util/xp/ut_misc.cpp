@@ -288,6 +288,14 @@ gchar ** UT_cloneAndDecodeAttributes (const gchar ** attrs)
     return attrs2;
 }
 
+const gchar* UT_getAttribute( const gchar* name,
+                              const gchar** atts, const gchar* def )
+{
+    const gchar* p = UT_getAttribute ( name, atts );
+    return p ? p : def;
+}
+
+
 const gchar* UT_getAttribute(const gchar* name, const gchar** atts)
 {
 	UT_return_val_if_fail( atts, NULL );
@@ -340,8 +348,8 @@ UT_sint32 signedHiWord(UT_uint32 dw)
  * string in the vector will contain the remainder of the original string 
  * (str).
  */
-UT_GenericVector<UT_String*> * simpleSplit (const UT_String & str, char separator,
-						 size_t max)
+UT_GenericVector<UT_String*> * simpleSplit ( const UT_String & str, char separator,
+                                             size_t max)
 {
 	UT_GenericVector<UT_String*> * utvResult = new UT_GenericVector<UT_String*>();
 	UT_String* utsEntry;

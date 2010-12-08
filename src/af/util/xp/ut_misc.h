@@ -77,8 +77,17 @@ std::string UT_pathSuffix(std::string path);
 bool         UT_addOrReplacePathSuffix(std::string & sPath, const char* sSuffix);
  
 bool UT_isWordDelimiter(UT_UCSChar currentChar, UT_UCSChar followChar, UT_UCSChar prevChar);
-ABI_EXPORT const gchar* UT_getAttribute(const gchar* name,
-					   const gchar** atts);
+/**
+ * Get the attribute "name" from atts or NULL if no such attribute is in atts
+ */
+ABI_EXPORT const gchar* UT_getAttribute( const gchar* name,
+                                         const gchar** atts );
+/**
+ * Like UT_getAttribute(name,atts) but return the def value
+ * if there is no attibute name in atts.
+ */
+ABI_EXPORT const gchar* UT_getAttribute( const gchar* name,
+                                         const gchar** atts, const gchar* def );
 
 ABI_EXPORT gchar ** UT_cloneAndDecodeAttributes (const gchar ** attrs);
 
