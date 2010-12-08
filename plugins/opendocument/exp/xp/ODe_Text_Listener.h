@@ -30,6 +30,7 @@
 
 // External includes
 #include <stdio.h>
+#include <sstream>
 
 // Internal classes
 class ODe_AutomaticStyles;
@@ -163,6 +164,15 @@ private:
     UT_sint32 m_iCurrentTOC;
 
     UT_UTF8String& appendAttribute( UT_UTF8String& ret, const char* key, const char* value );
+
+
+    // For ODT Change Tracking
+    std::stringstream m_ctpTextPEnclosingElementCloseStream;
+    int m_ctpParagraphAdditionalSpacesOffset;
+    std::stringstream m_ctpTextSpanEnclosingElementCloseStream;
+    int m_ctpSpanAdditionalSpacesOffset;
+    
+    
 };
 
 #endif /*ODE_TEXT_LISTENER_H_*/

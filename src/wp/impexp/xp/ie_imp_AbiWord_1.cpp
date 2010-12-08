@@ -818,6 +818,7 @@ void IE_Imp_AbiWord_1::startElement(const gchar *name,
 		{
 			m_currentRevisionId = atoi(szS);
 			m_currentRevisionTime = 0;
+            m_currentRevisionAuthor = "";
 
 			szS = UT_getAttribute("time-started",atts);
 			if(szS)
@@ -826,6 +827,10 @@ void IE_Imp_AbiWord_1::startElement(const gchar *name,
 			szS = UT_getAttribute("version",atts);
 			if(szS)
 				m_currentRevisionVersion = atoi(szS);
+
+			szS = UT_getAttribute("author",atts);
+			if(szS)
+				m_currentRevisionAuthor = szS;
 		}
 
 		goto cleanup;
@@ -1306,9 +1311,11 @@ void IE_Imp_AbiWord_1::endElement(const gchar *name)
 		{
 			// the revision had no comment associated, so it was not
 			// added to the doc by the xml paraser
-			X_CheckError(getDoc()->addRevision(m_currentRevisionId, NULL, 0,
-											   m_currentRevisionTime,
-											   m_currentRevisionVersion, true));
+			X_CheckError(getDoc()->addRevision( m_currentRevisionId, NULL, 0,
+                                                m_currentRevisionTime,
+                                                m_currentRevisionVersion,
+                                                m_currentRevisionAuthor,
+                                                true ));
 			m_currentRevisionId = 0;
 		}
 		

@@ -687,7 +687,33 @@ const AD_Revision * AD_Document::getHighestRevision() const
 	return r;
 }
 
-bool AD_Document::addRevision(UT_uint32 iId, UT_UCS4Char * pDesc, time_t tStart, UT_uint32 iVer, bool bGenCR)
+bool
+AD_Document::addRevision( UT_uint32 iId,
+                          const UT_UCS4Char * pDesc, UT_uint32 iLen,
+                          time_t tStart, UT_uint32 iVer,
+                          bool bGenCR)
+{
+    return addRevision( iId, pDesc, iLen, tStart, iVer, "", bGenCR );
+}
+
+bool
+AD_Document::addRevision( UT_uint32 iId, const std::string& desc,
+                          time_t tStart, UT_uint32 iVersion,
+                          const std::string& author,
+                          bool bGenCR )
+{
+    UT_UCS4String desc_ics4( desc.c_str() );
+    const UT_UCS4Char* pDesc = desc_ics4.ucs4_str();
+    UT_uint32 iLen = desc_ics4.length();
+    
+    bool ret = addRevision( iId, pDesc, iLen,
+                            tStart, iVersion, author, bGenCR );
+    return ret;
+}
+
+
+bool
+AD_Document::addRevision( UT_uint32 iId, UT_UCS4Char * pDesc, time_t tStart, UT_uint32 iVer, bool bGenCR)
 {
 	for(UT_sint32 i = 0; i < m_vRevisions.getItemCount(); i++)
 	{
@@ -704,7 +730,9 @@ bool AD_Document::addRevision(UT_uint32 iId, UT_UCS4Char * pDesc, time_t tStart,
 
 bool AD_Document::addRevision(UT_uint32 iId,
 							  const UT_UCS4Char * pDesc, UT_uint32 iLen,
-							  time_t tStart, UT_uint32 iVer,bool bGenCR)
+							  time_t tStart, UT_uint32 iVer,
+                              const std::string& author,
+                              bool bGenCR)
 {
 	for(UT_sint32 i = 0; i < m_vRevisions.getItemCount(); i++)
 	{
@@ -722,7 +750,7 @@ bool AD_Document::addRevision(UT_uint32 iId,
 		pD[iLen] = 0;
 	}
 	
-	AD_Revision * pRev = new AD_Revision(iId, pD, tStart, iVer);
+	AD_Revision * pRev = new AD_Revision(iId, pD, tStart, iVer, author);
 	addRevision(pRev,bGenCR);
 	m_iRevisionID = iId;
 	return true;
