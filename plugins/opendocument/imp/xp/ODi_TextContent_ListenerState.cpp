@@ -138,12 +138,6 @@ ODi_TextContent_ListenerState::~ODi_TextContent_ListenerState()
  * somethingThatWantsArrayOfCharPointers(ppAtts.data());
  * and the array goes away here.
  *
- * Another way to say it is shown below, but push_back() seems cleaner.
- * propertyArray<> ppAtts;
- * ppAtts[ppAtts.count()] = PT_REVISION_ATTRIBUTE_NAME;
- * ppAtts[ppAtts.count()] = "foo";
- * somethingThatWantsArrayOfCharPointers(ppAtts.data());
- *
  * This replaces the style below, note that the code is similar,
  * though the explicit index "i" is not needed above.
  * 
@@ -160,34 +154,41 @@ template< std::size_t N = 32 >
 class propertyArray
 {
 public:
+    typedef const gchar* T;
     typedef boost::array< const gchar*, N > m_boostArray_t;
+    typedef typename m_boostArray_t::value_type value_type;
+    typedef typename m_boostArray_t::iterator   iterator;
+    typedef typename m_boostArray_t::const_iterator   const_iterator;
     typedef typename m_boostArray_t::reference reference;
     typedef typename m_boostArray_t::const_reference const_reference;
-    
+    typedef std::size_t    size_type;
+
     propertyArray()
         :
         m_highestUsedIndex( 0 )
     {
-        this->assign( 0 );
+        m_array.assign( 0 );
     }
     
     void push_back( const gchar* v )
     {
         std::size_t sz = count();
-        this->at(sz) = v;
+        m_array.at(sz) = v;
     }
 
     std::size_t count() const
     {
-        return 
-        for( std::size_t i = 0; i < this->size(); i++ )
-        {
-            if( this->at(i) == 0 )
-                return i;
-        }
-        return 0;
+        return m_highestUsedIndex;
     }
 
+    const_reference operator[](size_type i) const 
+    {
+        return m_array.at(i);
+    }
+    static size_type size() { return N; }
+    T* data() { return m_array.data(); }
+
+    
 private:
     std::size_t     m_highestUsedIndex;
     m_boostArray_t  m_array;
