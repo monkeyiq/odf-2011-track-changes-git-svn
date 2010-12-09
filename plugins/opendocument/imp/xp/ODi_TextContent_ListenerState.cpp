@@ -158,11 +158,15 @@ ODi_TextContent_ListenerState::~ODi_TextContent_ListenerState()
  */
 template< std::size_t N = 32 >
 class propertyArray
-    :
-    public boost::array< const gchar*, N > 
 {
 public:
+    typedef boost::array< const gchar*, N > m_boostArray_t;
+    typedef typename m_boostArray_t::reference reference;
+    typedef typename m_boostArray_t::const_reference const_reference;
+    
     propertyArray()
+        :
+        m_highestUsedIndex( 0 )
     {
         this->assign( 0 );
     }
@@ -175,6 +179,7 @@ public:
 
     std::size_t count() const
     {
+        return 
         for( std::size_t i = 0; i < this->size(); i++ )
         {
             if( this->at(i) == 0 )
@@ -182,7 +187,10 @@ public:
         }
         return 0;
     }
-    
+
+private:
+    std::size_t     m_highestUsedIndex;
+    m_boostArray_t  m_array;
 };
 
 
