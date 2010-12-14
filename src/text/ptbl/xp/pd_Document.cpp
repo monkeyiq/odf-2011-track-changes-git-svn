@@ -1019,7 +1019,15 @@ UT_Error PD_Document::newDocument(void)
 	setDocVersion(0);
 	setEditTime(0);
 	setLastOpenedTime(time(NULL));
-	
+
+    // set document metadata from context
+    {
+        const gchar* name = g_get_real_name();
+        if( !strcmp( name, "Unknown" ))
+            name = g_get_user_name();
+        setMetaDataProp( PD_META_KEY_CREATOR, name );
+    }
+
 	// mark the document as not-dirty
 	_setClean();
 	UT_ASSERT(isOrigUUID());

@@ -56,6 +56,7 @@ public:
 	char *              getNthItemText(UT_uint32 n) const;
 
 	const char *        getNthItemTime(UT_uint32 n) const;
+	time_t              getNthItemTimeT(UT_uint32 n) const;
 	
 	UT_uint32           getSelectedId() const {return m_iId;}
 

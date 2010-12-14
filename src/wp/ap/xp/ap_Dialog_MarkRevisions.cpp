@@ -172,6 +172,11 @@ void AP_Dialog_MarkRevisions::addRevision()
 	if(m_pRev)
 		iId = m_pRev->getId() + 1;
 
+    //
+    // Work out what we want to use for the author of this revision.
+    // First try abicollab and then fall back to using the
+    // information from the document metadata (from File/Properties... window)
+    //
     std::string author = "";
 	UT_sint32 myAuthorId = m_pDoc->getMyAuthorInt();
     if( myAuthorId != -1 )
@@ -181,6 +186,14 @@ void AP_Dialog_MarkRevisions::addRevision()
             const gchar * szValue;
             if( a->getProperty( PT_AUTHOR_NAME, szValue))
                 author = szValue;
+        }
+    }
+    if( author.empty() )
+    {
+        UT_UTF8String prop;
+        if ( m_pDoc->getMetaDataProp ( PD_META_KEY_CREATOR, prop ) )
+        {
+            author = prop.utf8_str();
         }
     }
     

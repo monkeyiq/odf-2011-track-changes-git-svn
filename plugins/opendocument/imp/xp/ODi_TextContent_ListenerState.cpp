@@ -50,71 +50,12 @@
 #include <sstream>
 #include <list>
 
+
+/************************************************************/
+/************************************************************/
+/************************************************************/
+
 #include <boost/array.hpp>
-
-/************************************************************/
-/************************************************************/
-/************************************************************/
-
-/**
- * Constructor
- */
-ODi_TextContent_ListenerState::ODi_TextContent_ListenerState (
-                PD_Document* pDocument,
-                ODi_Office_Styles* pStyles,
-                ODi_ElementStack& rElementStack,
-		ODi_Abi_Data& rAbiData)
-                : ODi_ListenerState("TextContent", rElementStack),
-                  m_pAbiDocument ( pDocument ),
-                  m_pStyles(pStyles),
-                  m_bAcceptingText(false),
-                  m_bOpenedBlock(false),
-                  m_inAbiSection(false),
-                  m_openedFirstAbiSection(false),
-                  m_bPendingSection(false),
-                  m_currentODSection(ODI_SECTION_NONE),
-                  m_elementParsingLevel(0),
-                  m_pCurrentTOCParser(NULL),
-                  m_bOnContentStream(false),
-                  m_pCurrentListStyle(NULL),
-                  m_listLevel(0),
-                  m_alreadyDefinedAbiParagraphForList(false),
-                  m_pendingNoteAnchorInsertion(false),
-                  m_bPendingAnnotation(false),
-                  m_bPendingAnnotationAuthor(false),
-                  m_bPendingAnnotationDate(false),
-                  m_iAnnotation(0),
-                  m_bPageReferencePending(false),
-                  m_iPageNum(0),
-                  m_dXpos(0.0),
-                  m_dYpos(0.0),
-                  m_sProps(""),
-                  m_rAbiData(rAbiData),
-                  m_bPendingTextbox(false),
-                  m_bHeadingList(false),
-                  m_prevLevel(0),
-                  m_bContentWritten(false)
-                , m_ctParagraphDeletedRevision(-1)
-                , m_ctMostRecentWritingVersion("")
-                , m_ctHaveSpanFmt(false)
-                , m_ctHaveParagraphFmt(false)
-                , m_ctSpanDepth(0)
-{
-    UT_ASSERT_HARMLESS(m_pAbiDocument);
-    UT_ASSERT_HARMLESS(m_pStyles);
-}
-
-
-/**
- * Destructor
- */
-ODi_TextContent_ListenerState::~ODi_TextContent_ListenerState() 
-{
-    if (m_tablesOfContentProps.getItemCount() > 0) {
-        UT_DEBUGMSG(("ERROR ODti: table of content props not empty\n"));
-        UT_VECTOR_PURGEALL(UT_UTF8String*, m_tablesOfContentProps);
-    }
-}
 
 /**
  * As at 2010 there are many pieces of code that declare an array of
@@ -194,6 +135,69 @@ private:
     m_boostArray_t  m_array;
 };
 
+/************************************************************/
+/************************************************************/
+/************************************************************/
+
+/**
+ * Constructor
+ */
+ODi_TextContent_ListenerState::ODi_TextContent_ListenerState (
+                PD_Document* pDocument,
+                ODi_Office_Styles* pStyles,
+                ODi_ElementStack& rElementStack,
+		ODi_Abi_Data& rAbiData)
+                : ODi_ListenerState("TextContent", rElementStack),
+                  m_pAbiDocument ( pDocument ),
+                  m_pStyles(pStyles),
+                  m_bAcceptingText(false),
+                  m_bOpenedBlock(false),
+                  m_inAbiSection(false),
+                  m_openedFirstAbiSection(false),
+                  m_bPendingSection(false),
+                  m_currentODSection(ODI_SECTION_NONE),
+                  m_elementParsingLevel(0),
+                  m_pCurrentTOCParser(NULL),
+                  m_bOnContentStream(false),
+                  m_pCurrentListStyle(NULL),
+                  m_listLevel(0),
+                  m_alreadyDefinedAbiParagraphForList(false),
+                  m_pendingNoteAnchorInsertion(false),
+                  m_bPendingAnnotation(false),
+                  m_bPendingAnnotationAuthor(false),
+                  m_bPendingAnnotationDate(false),
+                  m_iAnnotation(0),
+                  m_bPageReferencePending(false),
+                  m_iPageNum(0),
+                  m_dXpos(0.0),
+                  m_dYpos(0.0),
+                  m_sProps(""),
+                  m_rAbiData(rAbiData),
+                  m_bPendingTextbox(false),
+                  m_bHeadingList(false),
+                  m_prevLevel(0),
+                  m_bContentWritten(false)
+                , m_ctParagraphDeletedRevision(-1)
+                , m_ctMostRecentWritingVersion("")
+                , m_ctHaveSpanFmt(false)
+                , m_ctHaveParagraphFmt(false)
+                , m_ctSpanDepth(0)
+{
+    UT_ASSERT_HARMLESS(m_pAbiDocument);
+    UT_ASSERT_HARMLESS(m_pStyles);
+}
+
+
+/**
+ * Destructor
+ */
+ODi_TextContent_ListenerState::~ODi_TextContent_ListenerState() 
+{
+    if (m_tablesOfContentProps.getItemCount() > 0) {
+        UT_DEBUGMSG(("ERROR ODti: table of content props not empty\n"));
+        UT_VECTOR_PURGEALL(UT_UTF8String*, m_tablesOfContentProps);
+    }
+}
 
 
 /**
@@ -416,7 +420,6 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
                 propertyArray<> ppAtts;
                 ppAtts.push_back( PT_REVISION_ATTRIBUTE_NAME );
                 ppAtts.push_back( ctRevision.getXMLstring() );
-                ppAtts.push_back( 0 );
                 _pushInlineFmt(ppAtts.data());
                 bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
                 UT_ASSERT(ok);
