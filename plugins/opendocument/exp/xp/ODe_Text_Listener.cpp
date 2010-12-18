@@ -266,13 +266,12 @@ void ODe_Text_Listener::openSpan(const PP_AttrProp* pAP) {
                            << " delta:removal-change-idref="
                            << "\"" << idref << "\""
                            << "/>"
-                           << endl;
+                           << "";
                         ODe_writeUTF8String(m_pParagraphContent, ss.str().c_str());
 
                         m_ctpTextSpanEnclosingElementCloseStream << "<delta:removed-content-end delta:removed-text-idref="
                                                                  << "\"" << itid << "\""
-                                                                 << "/>"
-                                                                 << endl;
+                                                                 << "/>";
                     }
                 }
                 else if( last->getId() > ctp->getData().getVersionWhichIntroducesParagraph() )
@@ -285,13 +284,12 @@ void ODe_Text_Listener::openSpan(const PP_AttrProp* pAP) {
                        << " delta:insertion-change-idref="
                        << "\"" << idref << "\""
                        << "/>"
-                       << endl;
+                       << "";
                     ODe_writeUTF8String(m_pParagraphContent, ss.str().c_str());
             
                     m_ctpTextSpanEnclosingElementCloseStream << "<delta:inserted-text-end delta:inserted-text-idref="
                                                              << "\"" << itid << "\""
-                                                             << "/>"
-                                                             << endl;
+                                                             << "/>";
                 }
             }
         }

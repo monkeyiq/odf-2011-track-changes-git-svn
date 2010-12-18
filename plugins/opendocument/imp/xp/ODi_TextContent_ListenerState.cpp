@@ -115,6 +115,7 @@ public:
     {
         std::size_t sz = count();
         m_array.at(sz) = v;
+        m_highestUsedIndex++;
     }
 
     std::size_t count() const
@@ -259,12 +260,6 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
 			m_bPendingSection = true;
         }
 
-    } else if (!strcmp(pName, "delta:removed-content" )) {
-
-        std::string idref = UT_getAttribute("delta:removal-change-idref", ppAtts, "");
-        m_ctParagraphDeletedRevision = toType<UT_uint32>(idref);
-        UT_DEBUGMSG(("DELETE paraRevision:%s\n", idref.c_str() ));
-
     } else if (!strcmp(pName, "text:p" )) {
 
         if (m_bPendingAnnotation) {
@@ -387,6 +382,12 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
             
         rAction.pushState(m_pCurrentTOCParser, false);
 
+    } else if (!strcmp(pName, "delta:removed-content" )) {
+
+        std::string idref = UT_getAttribute("delta:removal-change-idref", ppAtts, "");
+        m_ctParagraphDeletedRevision = toType<UT_uint32>(idref);
+        UT_DEBUGMSG(("DELETE paraRevision:%s\n", idref.c_str() ));
+
     } else if (!strcmp(pName, "delta:removed-content-start")) {
 
         _flush ();
@@ -395,16 +396,21 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
         std::string idref    = UT_getAttribute("delta:removal-change-idref", ppAtts, "" );
         PP_RevisionAttr ctRevision;
         
-        UT_DEBUGMSG(("delta:removed-content-start tid:%s idref:%s\n", ctTextID.c_str(), idref.c_str()));
+        UT_DEBUGMSG(("delta:removed-content-start tid:%s idref:%s m_ctMostRecentWritingVersion:%s\n", ctTextID.c_str(), idref.c_str(), m_ctMostRecentWritingVersion.c_str() ));
+        UT_DEBUGMSG(("delta:removed-content-start added in revision:%s removed in:%s\n",
+                     m_ctMostRecentWritingVersion.c_str(), idref.c_str()  ));
         if( !m_ctMostRecentWritingVersion.empty() )
         {
+            UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
+            
             const gchar ** pAttrs = 0;
             const gchar ** pProps = 0;
             ctRevision.addRevision( toType<UT_uint32>(m_ctMostRecentWritingVersion),
                                     PP_REVISION_ADDITION,
                                     pAttrs, pProps );
         }
-        
+
+        UT_DEBUGMSG(("ODTCT ctRevision.addRevision() del rev:%s\n", idref.c_str() ));
         const gchar ** pAttrs = 0;
         const gchar ** pProps = 0;
         ctRevision.addRevision( toType<UT_uint32>(idref),
@@ -452,6 +458,7 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
             {
                 PP_RevisionAttr ctRevision;
                 {
+                    UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
                     const gchar ** pAttrs = 0;
                     const gchar ** pProps = 0;
                     ctRevision.addRevision( toType<UT_uint32>(m_ctMostRecentWritingVersion),
@@ -483,6 +490,7 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
         m_ctMostRecentWritingVersion = idref;
         
         UT_DEBUGMSG(("delta:inserted-text-start tid:%s idref:%s\n", ctTextID.c_str(), idref.c_str()));
+        UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", idref.c_str() ));
         const gchar ** pAttrs = 0;
         const gchar ** pProps = 0;
         ctRevision.addRevision( toType<UT_uint32>(idref),
@@ -514,6 +522,7 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
         m_pAbiDocument->appendFmt(&m_vecInlineFmt);
 
     } else if (!strcmp(pName, "text:span")) {
+
         // Write all text that is between the last element tag and this
         // <text:span>
         _flush ();
@@ -529,6 +538,7 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
         
             PP_RevisionAttr ctRevision;
             {
+                UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
                 const gchar ** pAttrs = 0;
                 const gchar ** pProps = 0;
                 ctRevision.addRevision( toType<UT_uint32>(m_ctMostRecentWritingVersion),
@@ -1155,6 +1165,8 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
 
     } else if (!strcmp(pName, "text:p" ) || !strcmp(pName, "text:h" )) {
 
+        UT_DEBUGMSG(("text:p ending .. m_ctHaveParagraphFmt:%d\n", m_ctHaveParagraphFmt ));
+
         if( m_ctHaveParagraphFmt )
         {
             _popInlineFmt();
@@ -1184,6 +1196,7 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
             {
                 PP_RevisionAttr ctRevision;
                 {
+                    UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
                     const gchar ** pAttrs = 0;
                     const gchar ** pProps = 0;
                     ctRevision.addRevision( toType<UT_uint32>(m_ctMostRecentWritingVersion),
@@ -1835,12 +1848,14 @@ void ODi_TextContent_ListenerState::_startParagraphElement (const gchar* /*pName
         {
             UT_DEBUGMSG(("ODTCT ctInsertionType:%s\n", ctInsertionType.c_str() ));
             UT_DEBUGMSG(("ODTCT ctInsertionChangeIDRef:%s\n", ctInsertionChangeIDRef.c_str() ));
+            UT_DEBUGMSG(("ODTCT ctParagraphDeletedRevision:%d\n", m_ctParagraphDeletedRevision ));
         }
 
         if( ctInsertionType == "insert-with-content" )
         {
             if( !ctInsertionChangeIDRef.empty() )
             {
+                UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add startparaA rev:%s\n", ctInsertionChangeIDRef.c_str() ));
                 const gchar ** pAttrs = 0;
                 const gchar ** pProps = 0;
                 ctRevision.addRevision( toType<UT_uint32>(ctInsertionChangeIDRef),
@@ -1850,6 +1865,7 @@ void ODi_TextContent_ListenerState::_startParagraphElement (const gchar* /*pName
         }
         if( m_ctParagraphDeletedRevision != -1 )
         {
+            UT_DEBUGMSG(("ODTCT ctRevision.addRevision() del startpara rev:%d\n", m_ctParagraphDeletedRevision ));
             const gchar ** pAttrs = 0;
             const gchar ** pProps = 0;
             ctRevision.addRevision( m_ctParagraphDeletedRevision,
@@ -2102,8 +2118,10 @@ void ODi_TextContent_ListenerState::_startParagraphElement (const gchar* /*pName
 
         // handle revision information
         {
+            
             PP_RevisionAttr ctRevision;
             {
+                UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add startpara rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
                 const gchar ** pAttrs = 0;
                 const gchar ** pProps = 0;
                 ctRevision.addRevision( toType<UT_uint32>(m_ctMostRecentWritingVersion),
@@ -2120,6 +2138,7 @@ void ODi_TextContent_ListenerState::_startParagraphElement (const gchar* /*pName
             bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
             UT_ASSERT(ok);
             m_ctHaveParagraphFmt = true;
+            UT_DEBUGMSG(("ODTCT ADD paraRevision2:%s\n", ctRevision.getXMLstring() ));
         }
 
         
@@ -2214,6 +2233,13 @@ void ODi_TextContent_ListenerState::_endParagraphElement (
     }
 
     m_ctParagraphDeletedRevision = -1;
+    if( m_ctHaveParagraphFmt )
+    {
+        m_ctHaveParagraphFmt = false;
+        // FIXME: only if the para pushed.
+        _popInlineFmt();
+    }
+    
 }
 
 
