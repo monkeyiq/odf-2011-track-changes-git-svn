@@ -79,7 +79,7 @@ ODe_RevisionsTable::write( GsfOutput* pODT, PD_Document* pAbiDoc ) const
         UT_UTF8String descutf8;
         descutf8.appendUCS4( pRev->getDescription() );
         
-        ss << "  <delta:change-transaction delta:change-id=\"" << changeID << "\">" << endl
+        ss << "  <delta:change-transaction delta:change-id=\"" <<  changeID << "\">" << endl
            << "     <delta:change-info>"                                 << endl
            << "       <dc:creator>" << author << "</dc:creator>"         << endl
            << "       <dc:date>" << mtimestr << "</dc:date>"             << endl

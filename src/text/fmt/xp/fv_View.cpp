@@ -91,7 +91,7 @@
 #include "xap_DialogFactory.h"
 #include "ap_Preview_Annotation.h"
 #include "ap_Dialog_Id.h"
-
+#include "ut_conversion.h"
 #include "pp_Revision.h"
 
 #include "fv_View.h"
@@ -3703,8 +3703,69 @@ void FV_View::insertParagraphBreak(void)
 		bBefore = true;
 		pBlock->deleteListLabel();
 	}
+
+	//
+	// Unless something has decided not to, insert the new block strux
+	//
 	if(bStopList == false)
-		m_pDoc->insertStrux(getPoint(), PTX_Block);
+	{
+		if( m_pDoc->getHighestRevisionId() )
+		{
+			const gchar  * attributes[10];
+			const gchar ** properties = 0;
+
+			std::string splitID = "";
+
+			// FIXME: check if there is a SPLIT_ID already...
+			//  if not add one for sdh
+			// use that splitid for a id_ref in the new insertStrux.
+
+			bool ok = false;
+			const gchar* tstring = NULL;
+
+			ok = m_pDoc->getAttributeFromSDH( sdh, isShowRevisions(), getRevisionLevel(),
+											  PT_CHANGETRACKING_SPLIT_ID, &tstring );
+			if( ok && tstring && strcmp(tstring,"0"))
+			{
+				splitID = tstring;
+				UT_DEBUGMSG(("ODTCT have existing id\n" ));
+			}
+			else
+			{
+				UT_uint32 ID = m_pDoc->getUID(UT_UniqueId::ODTCTSplit);
+				splitID = "split" + tostr(ID);
+				attributes[0] = PT_CHANGETRACKING_SPLIT_ID;
+				attributes[1] = splitID.c_str();
+				attributes[2] = 0;
+				m_pDoc->changeStruxFormatNoUpdate( PTC_AddFmt, sdh, attributes );
+			}
+			UT_DEBUGMSG(("ODTCT ok:%d\n", ok ));
+			if( ok && tstring )
+				UT_DEBUGMSG(("ODTCT tstring:%s\n", tstring ));
+			UT_DEBUGMSG(("ODTCT splitid:%s\n", splitID.c_str() ));
+			
+			
+			
+			attributes[0] = PT_CHANGETRACKING_SPLIT_ID_REF;
+			attributes[1] = splitID.c_str();
+			attributes[2] = PT_CHANGETRACKING_SPLIT_ID;
+			attributes[3] = "0";
+			attributes[4] = 0;
+			// attributes[2] = PT_CHANGETRACKING_SPLIT_IS_NEW;
+			// attributes[3] = "1";
+			attributes[4] = 0;
+			m_pDoc->insertStrux(getPoint(), PTX_Block, attributes, properties );
+
+//			// And merge the split id into the old block.
+//			attributes[3] = "0";
+//			m_pDoc->changeStruxFormatNoUpdate( PTC_AddFmt, sdh, attributes );
+			
+		}
+		else
+		{
+			m_pDoc->insertStrux(getPoint(), PTX_Block);
+		}
+	}
 	if(bBefore == true)
 	{
 		fl_BlockLayout * pPrev = static_cast<fl_BlockLayout *>(getCurrentBlock()->getPrev());

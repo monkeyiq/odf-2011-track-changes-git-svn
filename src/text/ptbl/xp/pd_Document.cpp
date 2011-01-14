@@ -6161,7 +6161,7 @@ bool PD_Document::setAttrProp(const gchar ** ppAttr)
 
 		// now set standard attributes
 		UT_uint32 i = 0;
-		const UT_uint32 iSize = 21;
+		const UT_uint32 iSize = 23;
 		const gchar * attr[iSize];
 
 		attr[i++] = "xmlns";
@@ -6188,6 +6188,9 @@ bool PD_Document::setAttrProp(const gchar ** ppAttr)
 		attr[i++] = "xmlns:dc";
 		attr[i++] = "http://purl.org/dc/elements/1.1/";
 
+		attr[i++] = "xmlns:ct";
+		attr[i++] = "http://www.abisource.com/changetracking.dtd";
+        
 		attr[i++] = "fileformat";
 		attr[i++] = ABIWORD_FILEFORMAT_VERSION;
 

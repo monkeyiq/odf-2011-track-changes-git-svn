@@ -88,6 +88,7 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
   //        getFragments().verifyDoc();
 	if(m_pDocument->isMarkRevisions())
 	{
+        UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) TOP dpos1:%d dpos2:%d\n", dpos1, dpos2 ));
 		
 		bool bHdrFtr = false;
 		// if the user selected the whole document for deletion, we will not delete the
@@ -126,11 +127,14 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 			bool bHasEndStrux = false;
 			UT_sint32 iTableDepth = 0;
 
+            UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.top dpos1:%d dpos2:%d\n", dpos1, dpos2 ));
+            
 			if(!getFragsFromPositions(dpos1,dpos2, &pf1, &Offset1, &pf2, &Offset2))
 				return bRet;
 			else
 				bRet = true;
 
+            UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.2 dpos1:%d dpos2:%d\n", dpos1, dpos2 ));
 			// get attributes for this fragement
 			const PP_AttrProp * pAP2;
 			pf_Frag::PFType eType = pf1->getType();
@@ -234,6 +238,7 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 			if(!pAP2->getAttribute(name, pRevision))
 				pRevision = NULL;
 
+            UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.3 dpos1:%d dpos2:%d\n", dpos1, dpos2 ));
 			PP_RevisionAttr Revisions(pRevision);
 
 			// now we need to see if revision with this id is already
@@ -243,6 +248,13 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 			const PP_Revision * pRev = Revisions.getGreatestLesserOrEqualRevision(iId, &pS);
 
 			PT_DocPosition dposEnd = UT_MIN(dpos2,dpos1 + pf1->getLength());
+
+            {
+                UT_uint32 gid = 100;
+                if( pRev )
+                    gid = pRev->getId();
+                UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.4 pRev:%d iId:%d getId:%d\n", pRev!=0, iId, gid ));
+            }
 
 			if(pRev && iId == pRev->getId())
 			{
@@ -346,6 +358,7 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 					}
 					else
 					{
+                        UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) calling realDeleteSpan %d %d\n", dpos1, dposEnd ));
 						if(!_realDeleteSpan(dpos1, dposEnd, p_AttrProp_Before,bDeleteTableStruxes,
 											bDontGlob))
 							return false;
@@ -371,6 +384,7 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 			ppRevAttrib[0] = name;
 			ppRevAttrib[1] = Revisions.getXMLstring();
 			ppRevAttrib[2] = NULL;
+            UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.6 dpos1:%d dpos2:%d\n", dpos1, dpos2 ));
 
 			switch (eType)
 			{

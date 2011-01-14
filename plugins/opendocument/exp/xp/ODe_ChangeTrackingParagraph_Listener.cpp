@@ -50,7 +50,7 @@ ODe_ChangeTrackingParagraph_Listener::openBlock( const PP_AttrProp* pAP,
 {
     UT_DEBUGMSG(("ODe_CTPara_Listener::openBlock() pos:%d AP:%p\n",getCurrentDocumentPosition(),pAP));
     m_current = m_rAuxiliaryData.ensureChangeTrackingParagraphData( getCurrentDocumentPosition() );
-
+    
     const gchar* pValue;
     if( pAP->getAttribute("revision", pValue))
     {
@@ -59,6 +59,12 @@ ODe_ChangeTrackingParagraph_Listener::openBlock( const PP_AttrProp* pAP,
             UT_DEBUGMSG(("ODe_CTPara_Listener::openBlock() last-revision-number:%d\n", last->getId() ));
 
         m_current->getData().update( &ra );
+        m_current->getData().updatePara( &ra );
+    }
+
+    if( pAP->getAttribute(PT_CHANGETRACKING_SPLIT_ID, pValue))
+    {
+        m_current->getData().setSplitID( pValue );
     }
 }
 

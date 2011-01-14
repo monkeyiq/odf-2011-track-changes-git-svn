@@ -172,4 +172,7 @@ typedef const void * PL_StruxFmtHandle;
 #define PT_RDF_XMLID             (static_cast<const gchar *>("xml:id"))
 #define PT_XMLID                 (static_cast<const gchar *>("xml:id"))
 #define PT_RDF_END               (static_cast<const gchar *>("rdf:end"))
+#define PT_CHANGETRACKING_SPLIT_ID     (static_cast<const gchar *>("ct:split-id"))
+#define PT_CHANGETRACKING_SPLIT_ID_REF (static_cast<const gchar *>("ct:split-id-ref"))
+#define PT_CHANGETRACKING_SPLIT_IS_NEW (static_cast<const gchar *>("ct:split-is-new"))
 #endif /* PT_TYPES_H */

@@ -100,21 +100,38 @@ class ODe_ChangeTrackingParagraph_Data
   public:
     UT_uint32 m_minRevision;  //< lowest revision appearing in any <c> tag
     UT_uint32 m_maxRevision;  //< highest revision appearing in any <c> tag
-    UT_uint32 m_maxDeletedRevision; //< lowest -revision appearing in any <c> tag
+    UT_uint32 m_maxDeletedRevision; //< lowest  -revision appearing in any <c> tag
+    UT_uint32 m_minDeletedRevision; //< highest -revision appearing in any <c> tag
     bool      m_allSpansAreSameVersion; //< all <c> tags are the same revision
+    UT_uint32 m_maxParaRevision; //< highest revision appearing in <p> tag
+    UT_uint32 m_maxParaDeletedRevision;
+    std::string m_splitID;
     ODe_ChangeTrackingParagraph_Data()
         : m_minRevision(-1)
         , m_maxRevision(0)
         , m_maxDeletedRevision(0)
+        , m_minDeletedRevision(0)
         , m_allSpansAreSameVersion(true)
         , m_lastSpanVersion(-1)
+        , m_maxParaRevision(0)
+        , m_maxParaDeletedRevision(0)
     {
     }
     void update( const PP_RevisionAttr* ra );
+    void updatePara( const PP_RevisionAttr* ra );
     bool isParagraphDeleted();
+    bool isParagraphStartDeleted();
     UT_uint32 getVersionWhichRemovesParagraph();
     UT_uint32 getVersionWhichIntroducesParagraph();
- 
+    void setSplitID( const std::string& s ) 
+    {
+        m_splitID = s;
+    }
+    std::string getSplitID() 
+    {
+        return m_splitID;
+    }
+    
         
 };
 
@@ -133,6 +150,9 @@ class ODe_ChangeTrackingScopedData
     PT_DocPosition   m_begin;
     PT_DocPosition   m_end;
     DataPayloadClass m_data;
+    typedef ODe_ChangeTrackingScopedData< DataPayloadClass >* _Selfp;
+    _Selfp m_prev;
+    _Selfp m_next;
 
   public:
 
@@ -142,6 +162,8 @@ class ODe_ChangeTrackingScopedData
         : m_begin( begin )
         , m_end( end )
         , m_data( data )
+        , m_next( 0 )
+        , m_prev( 0 )
     {
     }
     
@@ -172,6 +194,28 @@ class ODe_ChangeTrackingScopedData
     {
         return m_data;
     }
+
+    _Selfp getPrevious() const
+    {
+        return m_prev;
+    }
+    _Selfp getNext() const
+    {
+        return m_next;
+    }
+
+    
+    ///////////////////
+    // private
+    void setPrevious( ODe_ChangeTrackingScopedData< DataPayloadClass >* prev )
+    {
+        m_prev = prev;
+    }
+    void setNext( ODe_ChangeTrackingScopedData< DataPayloadClass >* n )
+    {
+        m_next = n;
+    }
+    
 };
 
 typedef ODe_ChangeTrackingScopedData< ODe_ChangeTrackingParagraph_Data >   ChangeTrackingParagraphData_t;
@@ -220,7 +264,12 @@ public:
     pChangeTrackingParagraphData_t ensureChangeTrackingParagraphData( PT_DocPosition pos );
     void deleteChangeTrackingParagraphData();
     void dumpChangeTrackingParagraphData();
-     
+
+    // Because ODTCT wants attributes like foo1 instead of just 1,
+    // methods call here to canonize the change-id numbers for use in XML
+    std::string toChangeID( const std::string& s );
+    std::string toChangeID( UT_uint32 v );
+    
     
 };
 

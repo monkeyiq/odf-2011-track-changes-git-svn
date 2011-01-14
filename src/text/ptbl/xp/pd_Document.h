@@ -674,7 +674,7 @@ PT_AttrPropIndex            getAPIFromSOH(PL_ObjectHandle odh);
 	/*
 	   The purpose of the following methods is to generate and manage
 	   document-wide unique identifiers; the indetifiers are type
-	   specific, with the types defined in UT_UniqueId class (ut_mics.h).
+	   specific, with the types defined in UT_UniqueId class (ut_misc.h).
 	   
        UT_uint32 getUID(type):    Generates an id of a given type or
                                   UT_UID_INVALID if unique id cannot

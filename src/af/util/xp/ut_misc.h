@@ -125,6 +125,7 @@ class ABI_EXPORT UT_UniqueId
 		Image,
 		Math,
 		Embed,
+        ODTCTSplit,
 
 		/* must be last; for internal use only !*/
 		_Last

@@ -218,7 +218,11 @@ private:
     bool m_ctHaveSpanFmt;       //< inside a text:span
     bool m_ctHaveParagraphFmt;  //< inside a text:p which has ct data
     long m_ctSpanDepth;         //< count of current text:span nesting
-    
+
+    std::string m_mergeIDRef;
+    bool m_mergeIsInsideTrailingPartialContent;
+    long m_paragraphNestingLevel;
+    std::string m_ctRevisionIDBeforeMergeBlock;
 };
 
 #endif //_ODI_TEXTCONTENT_LISTENERSTATE_H_

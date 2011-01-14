@@ -25,6 +25,7 @@
 // Internal includes
 #include "ODe_Common.h"
 #include "pp_Revision.h"
+#include "ut_conversion.h"
 
 
 ODe_AuxiliaryData::ODe_AuxiliaryData() :
@@ -88,6 +89,20 @@ void ODe_HeadingStyles::addStyleName(const gchar* pStyleName,
 /************************************************************/
 
 void
+ODe_ChangeTrackingParagraph_Data::updatePara( const PP_RevisionAttr* ra )
+{
+    m_maxParaRevision = m_maxRevision;
+    m_maxRevision = 0;
+
+    m_maxParaDeletedRevision = m_maxDeletedRevision;
+    m_maxDeletedRevision = 0;
+
+    m_minDeletedRevision = 0;
+    
+}
+
+
+void
 ODe_ChangeTrackingParagraph_Data::update( const PP_RevisionAttr* ra )
 {
     if( !ra->getRevisionsCount() )
@@ -147,9 +162,38 @@ ODe_ChangeTrackingParagraph_Data::update( const PP_RevisionAttr* ra )
     if( last->getType() == PP_REVISION_DELETION )
     {
         m_maxDeletedRevision = std::max( m_maxDeletedRevision, last->getId() );
+        if( !m_minDeletedRevision )
+            m_minDeletedRevision = last->getId();
+        m_minDeletedRevision = std::min( m_minDeletedRevision, last->getId() );
+        
     }
     
 }
+
+bool
+ODe_ChangeTrackingParagraph_Data::isParagraphStartDeleted()
+{
+    UT_DEBUGMSG(("isParagraphStartDeleted: id:%s maxR:%d maxDelR:%d minDelRev:%d all-spans-same-rev:%d\n",
+                 m_splitID.c_str(),
+                 m_maxRevision,
+                 m_maxDeletedRevision, m_minDeletedRevision,
+                 m_allSpansAreSameVersion ));
+
+    UT_DEBUGMSG(("isParagraphStartDeleted maxpr:%d maxpdr:%d\n",
+                 m_maxParaRevision,
+                 m_maxParaDeletedRevision ));
+
+    bool ret = false;
+    if( m_maxParaDeletedRevision )
+    {
+        if( m_minDeletedRevision < m_maxParaDeletedRevision )
+        {
+            ret = true;
+        }
+    }
+    return ret;
+}
+
 
 bool
 ODe_ChangeTrackingParagraph_Data::isParagraphDeleted()
@@ -209,6 +253,37 @@ ODe_AuxiliaryData::ensureChangeTrackingParagraphData( PT_DocPosition pos )
         return ret;
 
     ret = new ChangeTrackingParagraphData_t( pos, pos+1 );
+    UT_DEBUGMSG(("ODTCT adding new ctp at pos:%d\n", pos ));
+    UT_DEBUGMSG(("ODTCT m_ChangeTrackingParagraphs.size:%d\n", m_ChangeTrackingParagraphs.size() ));
+    
+    // find previous ctp and link it.
+    {
+        pChangeTrackingParagraphData_t prev = 0;
+        for( m_ChangeTrackingParagraphs_t::iterator iter = m_ChangeTrackingParagraphs.begin();
+             iter != m_ChangeTrackingParagraphs.end(); ++iter )
+        {
+            UT_DEBUGMSG(("ODTCT iter->end:%d\n", (*iter)->getEndPosition() ));
+            if( (*iter)->getEndPosition() <= pos )
+            {
+                if( !prev )
+                {
+                    prev = *iter;
+                }
+                else
+                {
+                    UT_DEBUGMSG(("ODTCT prev->end:%d\n", prev->getEndPosition() ));
+                    if( (*iter)->getEndPosition() > prev->getEndPosition() )
+                    {
+                        prev = *iter;
+                    }
+                }
+            }
+        }
+        UT_DEBUGMSG(("ODTCT setting prev:%d\n", prev!=0 ));
+        ret->setPrevious( prev );
+        if( prev )
+            prev->setNext( ret );
+    }
     m_ChangeTrackingParagraphs.push_back( ret );
     return ret;
 }
@@ -247,3 +322,16 @@ ODe_AuxiliaryData::dumpChangeTrackingParagraphData()
         
     }
 }
+
+std::string ODe_AuxiliaryData::toChangeID( const std::string& s )
+{
+    return s;
+//    return "ct" + s;
+}
+
+std::string ODe_AuxiliaryData::toChangeID( UT_uint32 v )
+{
+    return tostr(v);
+//    return "ct" + tostr(v);
+}
+
