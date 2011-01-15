@@ -100,11 +100,11 @@ class ODe_ChangeTrackingParagraph_Data
   public:
     UT_uint32 m_minRevision;  //< lowest revision appearing in any <c> tag
     UT_uint32 m_maxRevision;  //< highest revision appearing in any <c> tag
-    UT_uint32 m_maxDeletedRevision; //< lowest  -revision appearing in any <c> tag
-    UT_uint32 m_minDeletedRevision; //< highest -revision appearing in any <c> tag
+    UT_uint32 m_maxDeletedRevision;     //< lowest  -revision appearing in any <c> tag
+    UT_uint32 m_minDeletedRevision;     //< highest -revision appearing in any <c> tag
     bool      m_allSpansAreSameVersion; //< all <c> tags are the same revision
-    UT_uint32 m_maxParaRevision; //< highest revision appearing in <p> tag
-    UT_uint32 m_maxParaDeletedRevision;
+    UT_uint32 m_maxParaRevision;        //< highest revision appearing in <p> tag
+    UT_uint32 m_maxParaDeletedRevision; //< highest negative version number for para
     std::string m_splitID;
     ODe_ChangeTrackingParagraph_Data()
         : m_minRevision(-1)

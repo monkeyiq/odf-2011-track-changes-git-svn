@@ -525,9 +525,18 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
         UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", idref.c_str() ));
         const gchar ** pAttrs = 0;
         const gchar ** pProps = 0;
-        ctRevision.addRevision( toType<UT_uint32>(idref),
-                                PP_REVISION_ADDITION,
-                                pAttrs, pProps );
+        if( !idref.empty() )
+        {
+            ctRevision.addRevision( toType<UT_uint32>(idref),
+                                    PP_REVISION_ADDITION,
+                                    pAttrs, pProps );
+        }
+        else
+        {
+            ctRevision.addRevision( toType<UT_uint32>(ctTextID),
+                                    PP_REVISION_ADDITION,
+                                    pAttrs, pProps );
+        }
         
         if( strlen(ctRevision.getXMLstring()) )
         {
@@ -570,10 +579,15 @@ void ODi_TextContent_ListenerState::startElement (const gchar* pName,
         
             PP_RevisionAttr ctRevision;
             {
-                UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
+                const gchar* x = UT_getAttribute("delta:insertion-change-idref", ppAtts);
+                UT_DEBUGMSG(("ODTCT ctRevision.addRevision() t:span add explicit:%s mrw:%s\n",
+                             x, m_ctMostRecentWritingVersion.c_str() ));
+                if( !x )
+                    x = m_ctMostRecentWritingVersion.c_str();
+                
                 const gchar ** pAttrs = 0;
                 const gchar ** pProps = 0;
-                ctRevision.addRevision( toType<UT_uint32>(m_ctMostRecentWritingVersion),
+                ctRevision.addRevision( toType<UT_uint32>(x),
                                         PP_REVISION_ADDITION, pAttrs, pProps );
             }
             

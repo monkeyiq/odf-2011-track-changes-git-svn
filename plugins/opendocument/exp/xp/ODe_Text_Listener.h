@@ -167,11 +167,11 @@ private:
 
 
     // For ODT Change Tracking
-    std::stringstream m_ctpTextPEnclosingElementCloseStream;
-    int m_ctpParagraphAdditionalSpacesOffset;
-    std::stringstream m_ctpTextSpanEnclosingElementCloseStream;
-    int m_ctpSpanAdditionalSpacesOffset;
-    
+    std::stringstream m_ctpTextPBeforeClosingElementStream;  //< output before </text:p> is written
+    std::stringstream m_ctpTextPEnclosingElementCloseStream; //< output after  </text:p> is written
+    int m_ctpParagraphAdditionalSpacesOffset;                //< adjust m_spacesOffset during close of text:p
+    std::stringstream m_ctpTextSpanEnclosingElementCloseStream; //< output after </text:span> is written
+    int m_ctpSpanAdditionalSpacesOffset;                        //< adjust m_spacesOffset during close of text:span
     
 };
 

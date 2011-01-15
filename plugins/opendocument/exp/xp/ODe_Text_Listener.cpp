@@ -179,8 +179,17 @@ void ODe_Text_Listener::openBlock(const PP_AttrProp* pAP,
 /**
  * 
  */
-void ODe_Text_Listener::closeBlock() {
-    if (m_openedODParagraph) {
+void ODe_Text_Listener::closeBlock()
+{
+    if (m_openedODParagraph)
+    {
+        if( !m_ctpTextPBeforeClosingElementStream.str().empty() )
+        {
+            ODe_writeUTF8String(m_pParagraphContent,
+                                (const char*)m_ctpTextPBeforeClosingElementStream.str().c_str());
+            m_ctpTextPBeforeClosingElementStream.rdbuf()->str("");
+        }
+        
         if (m_isHeadingParagraph)
         {
             ODe_writeUTF8String(m_pParagraphContent, "</text:h>\n");
@@ -208,13 +217,14 @@ void ODe_Text_Listener::closeBlock() {
                 bool allDel = ctp->getData().isParagraphDeleted();
                 bool startDel = ctp->getData().isParagraphStartDeleted();
             
-                UT_DEBUGMSG(("ODTCT CB split:%s pos:%d min:%d max:%d vrem:%d vadd:%d start-del:%d\n",
+                UT_DEBUGMSG(("ODTCT CB split:%s pos:%d min:%d max:%d vrem:%d vadd:%d mpr:%d allDel:%d start-del:%d\n",
                              ctp->getData().getSplitID().c_str(),
                              pos,
                              ctp->getData().m_minRevision,
                              ctp->getData().m_maxRevision,
                              ctp->getData().getVersionWhichRemovesParagraph(),
                              ctp->getData().getVersionWhichIntroducesParagraph(),
+                             ctp->getData().m_maxParaRevision,
                              allDel,
                              startDel ));
 
@@ -1551,8 +1561,10 @@ void ODe_Text_Listener::_openODParagraph(const PP_AttrProp* pAP) {
     std::stringstream startOfParagraphWasDeletedPostamble;
     pChangeTrackingParagraphData_t ctp = m_rAuxiliaryData.getChangeTrackingParagraphData( getCurrentDocumentPosition() );
     UT_DEBUGMSG(("CT pos:%d have ctp pointer:%p\n",getCurrentDocumentPosition(),ctp));
+    m_ctpTextPBeforeClosingElementStream.rdbuf()->str("");
     m_ctpTextPEnclosingElementCloseStream.rdbuf()->str("");
     m_ctpParagraphAdditionalSpacesOffset = 0;
+    std::stringstream paragraphSplitPostamble;
     
 
     // PURE DEBUG BLOCK
@@ -1671,9 +1683,15 @@ void ODe_Text_Listener::_openODParagraph(const PP_AttrProp* pAP) {
             //     UT_DEBUGMSG(("ODTCT pIntroversion no prev found\n"));
             // }
 
+            UT_uint32 idref = ctp->getData().getVersionWhichIntroducesParagraph();
+            if( ctp->getData().m_maxParaRevision > idref )
+            {
+                idref = ctp->getData().m_maxParaRevision;
+            }
+            
             ctpTextPAttributesStream << " delta:insertion-type=\"" << insType << "\" "
                                      << " delta:insertion-change-idref=\""
-                                     << m_rAuxiliaryData.toChangeID( ctp->getData().getVersionWhichIntroducesParagraph())
+                                     << m_rAuxiliaryData.toChangeID( idref )
                                      << "\" ";
         }
         
@@ -1805,6 +1823,39 @@ void ODe_Text_Listener::_openODParagraph(const PP_AttrProp* pAP) {
         output += "/>";
     else
         output += ">";
+
+    if( ctp &&
+        ctp->getData().m_maxParaRevision > ctp->getData().getVersionWhichIntroducesParagraph() )
+    {
+        UT_uint32 idref = ctp->getData().m_maxParaRevision;
+        UT_uint32 id = ctp->getData().getVersionWhichIntroducesParagraph();
+        
+        UT_UTF8String output;
+        _printSpacesOffset(output);
+        // m_ctpTextPBeforeClosingElementStream << "</text:span>" << endl;
+        // paragraphSplitPostamble << endl << output.utf8_str()
+        //                         << "<text:span "
+        //                         << " text:style-name=\""
+        //                         << ODe_Style_Style::convertStyleToNCName(styleName).escapeXML().utf8_str()
+        //                         << "\" "
+        //                         << "delta:insertion-type=\"" << "insert-with-content" << "\" "
+        //                         << "delta:insertion-change-idref=\""
+        //                         << m_rAuxiliaryData.toChangeID( ctp->getData().getVersionWhichIntroducesParagraph() )
+        //                         << "\" >"
+        //                         << endl;
+        paragraphSplitPostamble << endl << output.utf8_str()
+                                << "<delta:inserted-text-start delta:inserted-text-id=\""
+                                << m_rAuxiliaryData.toChangeID( id )
+                                << "\" />" << endl;
+        m_ctpTextPBeforeClosingElementStream << "<delta:inserted-text-end delta:inserted-text-idref=\""
+                                             << m_rAuxiliaryData.toChangeID( id )
+                                             << "\" />"
+                                             << endl;
+        
+    }
+
+    
+    output += paragraphSplitPostamble.str();
     output += startOfParagraphWasDeletedPostamble.str();
     
     ////
@@ -1860,7 +1911,8 @@ void ODe_Text_Listener::_closeODList() {
  */
 void ODe_Text_Listener::_closeODParagraph() {
 
-    if (m_openedODParagraph) {         
+    if (m_openedODParagraph)
+    {
         gsf_output_write(m_pTextOutput, gsf_output_size(m_pParagraphContent),
 			 gsf_output_memory_get_bytes(GSF_OUTPUT_MEMORY(m_pParagraphContent)));
 
