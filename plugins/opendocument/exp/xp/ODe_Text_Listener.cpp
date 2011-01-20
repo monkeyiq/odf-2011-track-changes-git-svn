@@ -228,14 +228,17 @@ void ODe_Text_Listener::closeBlock()
                              allDel,
                              startDel ));
 
-                if( pChangeTrackingParagraphData_t n = ctp->getNext() )
+                if( !allDel )
                 {
-                    if( n->getData().isParagraphStartDeleted() )
+                    if( pChangeTrackingParagraphData_t n = ctp->getNext() )
                     {
-                        UT_DEBUGMSG(("ODTCT CB next paragraph has start deleted n.id:%s\n",
-                                     n->getData().getSplitID().c_str()
-                                        ));
-                        isStartOfNextParagraphDeleted = true;
+                        if( n->getData().isParagraphStartDeleted() )
+                        {
+                            UT_DEBUGMSG(("ODTCT CB next paragraph has start deleted n.id:%s\n",
+                                         n->getData().getSplitID().c_str()
+                                            ));
+                            isStartOfNextParagraphDeleted = true;
+                        }
                     }
                 }
             }
@@ -260,7 +263,7 @@ class ODFChangeTrackerIdFactory
     std::string m_prefix;
     UT_uint32 m_id;
 public:
-    ODFChangeTrackerIdFactory() : m_id(1) , m_prefix("ctid-")
+    ODFChangeTrackerIdFactory( const char* prefix = "ctid-" ) : m_id(1) , m_prefix(prefix)
     {
     };
     std::string createId()
@@ -357,8 +360,8 @@ void ODe_Text_Listener::openSpan(const PP_AttrProp* pAP) {
     }
      
     
-    if ( ODe_Style_Style::hasTextStyleProps(pAP) ) {
-            
+    if ( ODe_Style_Style::hasTextStyleProps(pAP) )
+    {
         // Need to create a new automatic style to hold those paragraph
         // properties.
         
@@ -371,9 +374,12 @@ void ODe_Text_Listener::openSpan(const PP_AttrProp* pAP) {
         m_rAutomatiStyles.storeTextStyle(pStyle);
         styleName = pStyle->getName();
         
-    } else {
+    }
+    else
+    {
         ok = pAP->getAttribute("style", pValue);
-        if (ok) {
+        if (ok)
+        {
             styleName = pValue;
         }
     }
@@ -1544,10 +1550,51 @@ bool isTrue( const char* s )
 }
 
 
+ODe_Text_Listener::stringlist_t
+ODe_Text_Listener::convertRevisionStringToAttributeStack( const PP_AttrProp* pAP,
+                                                          const char* attrName,
+                                                          const char* attrDefault )
+{
+    std::list< std::string > ret;
+
+    if( attrDefault )
+        ret.push_back( attrDefault );
+    
+    if( const char* revisionString = UT_getAttribute( pAP, "revision", 0 ))
+    {
+        PP_RevisionAttr ra( revisionString );
+        const PP_Revision* r = 0;
+
+        for( int raIdx = 0;
+             raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
+             raIdx++ )
+        {
+            const gchar*  a =  r->getAttrsString();
+            UT_DEBUGMSG(("ODTCT revisions idx:%d id:%d t:%d a:%s\n", raIdx, r->getId(), r->getType(), a ));
+
+            if( const char* x = UT_getAttribute( r, attrName, 0 ))
+                ret.push_back( x );
+        }
+    }
+
+    
+    return ret;
+}
+
+void
+ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
+                                             UT_UTF8String& output )
+{
+    
+}
+
+
 /**
  * 
  */
-void ODe_Text_Listener::_openODParagraph(const PP_AttrProp* pAP) {
+void
+ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
+{
 	UT_UTF8String abiStyleName;
     UT_UTF8String styleName;
     UT_UTF8String output;
@@ -1557,6 +1604,7 @@ void ODe_Text_Listener::_openODParagraph(const PP_AttrProp* pAP) {
     bool ok;
     std::stringstream ctpTextPEnclosingElementStream;
     std::stringstream ctpTextPAttributesStream;
+    bool              wholeOfParagraphWasDeleted = false;
     bool              startOfParagraphWasDeleted = false;
     std::stringstream startOfParagraphWasDeletedPostamble;
     pChangeTrackingParagraphData_t ctp = m_rAuxiliaryData.getChangeTrackingParagraphData( getCurrentDocumentPosition() );
@@ -1569,6 +1617,8 @@ void ODe_Text_Listener::_openODParagraph(const PP_AttrProp* pAP) {
 
     // PURE DEBUG BLOCK
     {
+        UT_DEBUGMSG(("ODTCT\n"));
+        
         ok = pAP->getAttribute(PT_CHANGETRACKING_SPLIT_ID, pValue);
         if (ok) UT_DEBUGMSG(("ODTCT TOP! split-id-from-attr:%s\n", pValue ));
         else    UT_DEBUGMSG(("ODTCT TOP! NO SPLIT_ID FOUND\n" ));
@@ -1582,10 +1632,10 @@ void ODe_Text_Listener::_openODParagraph(const PP_AttrProp* pAP) {
 
         if( ctp )
         {
-            bool allDel = ctp->getData().isParagraphDeleted();
+            bool allDel   = ctp->getData().isParagraphDeleted();
             bool startDel = ctp->getData().isParagraphStartDeleted();
             
-            UT_DEBUGMSG(("ODTCT min:%d max:%d vrem:%d vadd:%d start-del:%d\n",
+            UT_DEBUGMSG(("ODTCT min:%d max:%d vrem:%d vadd:%d allDel:%d startDel:%d\n",
                          ctp->getData().m_minRevision,
                          ctp->getData().m_maxRevision,
                          ctp->getData().getVersionWhichRemovesParagraph(),
@@ -1595,16 +1645,98 @@ void ODe_Text_Listener::_openODParagraph(const PP_AttrProp* pAP) {
         }
     }
 
+    //
+    // write out style revisions, this has to handle the change
+    // between text:p and text:h if the style changes as shown in
+    // example 6.13.2 of the odt change tracking spec.
+    //
+    // A para goes to a heading is represented as:
+    // 
+    // <delta:remove-leaving-content-start
+    //     delta:removal-change-idref='ct1234' 
+    //     delta:end-element-idref='ee888'>
+	//       <text:p text:style-name="Text_20_body"  />
+    // </delta:remove-leaving-content-start>
+    // <text:h text:style-name="Heading_20_1" text:outline-level="1"
+    //        delta:insertion-type='insert-around-content' delta:insertion-change-idref='ct1234'>
+    // The paragraph or heading contents...
+    // </text:h>
+    // <delta:remove-leaving-content-end delta:end-element-id='ee888'/>
+    //
+    {
+        std::list< std::string > sl = convertRevisionStringToAttributeStack( pAP, "style", "Normal" );
+        for( stringlist_t::iterator si = sl.begin(); si != sl.end(); ++si )
+        {
+            UT_DEBUGMSG(("ODTCT style stack:%s\n", si->c_str() ));
+
+            
+
+            // int outlineLevel = m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel(pValue);
+            // bool isHeading = (outlineLevel > 0);
+
+            // if( isHeading )
+            // {
+            // }
+            // else
+            // {
+            // }
+        }
+    }
+    
+    // if( const char* revisionString = UT_getAttribute( pAP, "revision", 0 ))
+    // {
+    //     PP_RevisionAttr ra( revisionString );
+    //     const PP_Revision* r = 0;
+
+    //     UT_DEBUGMSG(("ODTCT revision string:%s\n", revisionString ));
+    //     UT_DEBUGMSG(("ODTCT revision  count:%d\n", ra.getRevisionsCount() ));
+
+    //     for( int raIdx = ra.getRevisionsCount() - 1;
+    //          raIdx > 0 && (r = ra.getNthRevision( raIdx ));
+    //          --raIdx )
+    //     {
+    //         const PP_Revision* prev  = ra.getNthRevision( raIdx - 1 );
+    //         const gchar* pa = prev->getAttrsString();
+    //         const gchar*  a =  r->getAttrsString();
+    //         UT_DEBUGMSG(("ODTCT revisions idx:%d id:%d t:%d a:%s\n", raIdx, r->getId(), r->getType(), a ));
+    //         UT_DEBUGMSG(("ODTCT revisions prev  id:%d t:%d a:%s\n", prev->getId(), prev->getType(), pa ));
+    //         if( const char* style = UT_getAttribute( r, "style", 0 ))
+    //             UT_DEBUGMSG(("ODTCT revisions style:%s\n", style ));
+
+    //     }
+    // }
+    
 
     
     if( ctp )
     {
+        bool wholeOfLastParaWasDeleted = false;
+        wholeOfParagraphWasDeleted = ctp->getData().isParagraphDeleted();
         startOfParagraphWasDeleted = ctp->getData().isParagraphStartDeleted();
         std::string insType = "insert-with-content";
 
-        if( startOfParagraphWasDeleted )
+        if( pChangeTrackingParagraphData_t prev = ctp->getPrevious() )
         {
-            UT_DEBUGMSG(("ODTCT STARTDEL for id:%s\n",ctp->getData().getSplitID().c_str()));
+            wholeOfLastParaWasDeleted = prev->getData().isParagraphDeleted();
+        }
+
+        //
+        // When two paragraphs are merged together then the old
+        // <p><c>...</c></p> is still there but the <p> tag is deleted
+        // at a specific revision. So we detect this "start of
+        // paragraph gone" as a merge. However, if the whole previous
+        // paragraph was deleted then do not assume a merge.
+        //
+        if( wholeOfLastParaWasDeleted &&
+            !wholeOfParagraphWasDeleted &&
+            startOfParagraphWasDeleted )
+        {
+            startOfParagraphWasDeleted = false;
+        }
+        
+        if( !wholeOfParagraphWasDeleted && startOfParagraphWasDeleted )
+        {
+            UT_DEBUGMSG(("ODTCT STARTDELMER <delta:merge> for id:%s\n",ctp->getData().getSplitID().c_str()));
 
             std::string rmChangeID = m_rAuxiliaryData.toChangeID( ctp->getData().m_maxParaDeletedRevision );
             std::stringstream ss;
@@ -1619,12 +1751,21 @@ void ODe_Text_Listener::_openODParagraph(const PP_AttrProp* pAP) {
                                                 << "</delta:merge>" << endl;
         }
         
-        if( ctp->getData().isParagraphDeleted() )
+        if( wholeOfParagraphWasDeleted )
         {
+            const char* moveID = UT_getAttribute( pAP, "delta:move-id", 0 );
+
             UT_DEBUGMSG(("delta: paragraph is deleted...\n"));
             ctpTextPEnclosingElementStream << "<delta:removed-content delta:removal-change-idref=\""
                                            << ctp->getData().getVersionWhichRemovesParagraph()
-                                           << "\">" << endl;
+                                           << "\"";
+            if( moveID )
+            {
+                ctpTextPEnclosingElementStream << " delta:move-id=\""
+                                               << moveID
+                                               << "\"";
+            }
+            ctpTextPEnclosingElementStream << ">" << endl;
             m_ctpTextPEnclosingElementCloseStream << "</delta:removed-content>" << endl;
             m_ctpParagraphAdditionalSpacesOffset = 1;
 
@@ -1819,6 +1960,13 @@ void ODe_Text_Listener::_openODParagraph(const PP_AttrProp* pAP) {
         }
     }
 
+    if( const char* moveIDRef = UT_getAttribute( pAP, "delta:move-idref", 0 ))
+    {
+        output += " delta:move-idref=\"";
+        output += moveIDRef;
+        output += "\"";
+    }
+    
     if( startOfParagraphWasDeleted )
         output += "/>";
     else
