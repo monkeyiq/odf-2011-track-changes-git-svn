@@ -31,6 +31,8 @@
 // External includes
 #include <stdio.h>
 #include <sstream>
+#include <string>
+#include <list>
 
 // Internal classes
 class ODe_AutomaticStyles;
@@ -172,6 +174,23 @@ private:
     int m_ctpParagraphAdditionalSpacesOffset;                //< adjust m_spacesOffset during close of text:p
     std::stringstream m_ctpTextSpanEnclosingElementCloseStream; //< output after </text:span> is written
     int m_ctpSpanAdditionalSpacesOffset;                        //< adjust m_spacesOffset during close of text:span
+
+    /**
+     * Gather all of the attrName attributes from the revisions of
+     * pAP. The attrDefault if non zero is assumed to be the "normal"
+     * state and is taken as the value of rev=START. The return value
+     * is in order from the start of document to the last revision.
+     * ie, last(return value) is the last change.
+     */
+    typedef std::list< std::string > stringlist_t;
+    stringlist_t convertRevisionStringToAttributeStack( const PP_AttrProp* pAP,
+                                                        const char* attrName,
+                                                        const char* attrDefault );
+    void _openODParagraphToBuffer( const PP_AttrProp* pAP,
+                                   UT_UTF8String& output,
+                                   const std::string& additionalElementAttributes = "",
+                                   bool closeElementWithSlashGreaterThan = false );
+    stringlist_t m_genericBlockClosePostambleList;
     
 };
 

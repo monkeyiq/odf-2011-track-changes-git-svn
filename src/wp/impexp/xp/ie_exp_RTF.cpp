@@ -1990,9 +1990,9 @@ void IE_Exp_RTF::_write_charfmt(const s_RTF_AttrPropAdapter & apa)
 	{
 		_rtf_keyword ("v");
 	}
-	
-	
-	const gchar * szListTag = apa.getProperty("list-tag");
+
+
+    const gchar * szListTag = apa.getProperty("list-tag");
 	if (szListTag && *szListTag)
 	{
 		_rtf_open_brace();

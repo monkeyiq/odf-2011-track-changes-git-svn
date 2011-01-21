@@ -252,8 +252,14 @@ void ODe_Text_Listener::closeBlock()
                 ODe_writeUTF8String(m_pParagraphContent, "</text:p>\n");
             }
             
-            
         }
+
+        for( stringlist_t::iterator si = m_genericBlockClosePostambleList.begin();
+             si != m_genericBlockClosePostambleList.end(); ++si )
+        {
+            ODe_writeUTF8String(m_pParagraphContent, si->c_str() );
+        }
+        m_genericBlockClosePostambleList.clear();
     }
 }
 
@@ -274,6 +280,7 @@ public:
     }
 };
 static ODFChangeTrackerIdFactory m_ctIdFactory;
+static ODFChangeTrackerIdFactory m_cteeIDFactory("ee");
 
 
 
@@ -1581,10 +1588,209 @@ ODe_Text_Listener::convertRevisionStringToAttributeStack( const PP_AttrProp* pAP
     return ret;
 }
 
+std::string UT_getLatestAttribute( const PP_AttrProp* pAP,
+                                   const char* name,
+                                   const char* def )
+{
+    const char* t = 0;
+    std::string ret = def;
+    bool ok = false;
+    
+    if( const char* revisionString = UT_getAttribute( pAP, "revision", 0 ))
+    {
+        PP_RevisionAttr ra( revisionString );
+        const PP_Revision* r = 0;
+            
+        for( int raIdx = ra.getRevisionsCount()-1;
+             raIdx >= 0 && (r = ra.getNthRevision( raIdx ));
+             --raIdx )
+        {
+            ok = r->getAttribute( name, t );
+            if (ok)
+            {
+                ret = t;
+                return ret;
+            }
+        }
+    }
+
+    ok = pAP->getAttribute( name, t );
+    if (ok)
+    {
+        ret = t;
+        return ret;
+    }
+    ret = def;
+    
+    return ret;
+}
+
+
+
 void
 ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
-                                             UT_UTF8String& output )
+                                             UT_UTF8String& output,
+                                             const std::string& additionalElementAttributes,
+                                             bool closeElementWithSlashGreaterThan )
 {
+    UT_UTF8String styleName;
+    UT_UTF8String str;
+    UT_UTF8String escape;
+    const gchar* pValue;
+    bool ok;
+
+    ////
+    // Figure out the paragraph style
+    
+    if (ODe_Style_Style::hasParagraphStyleProps(pAP) ||
+        ODe_Style_Style::hasTextStyleProps(pAP) ||
+        m_pendingMasterPageStyleChange ||
+        m_pendingColumnBrake ||
+        m_pendingPageBrake)
+    {
+        UT_DEBUGMSG(("para styleA:%s\n", styleName.utf8_str() ));
+        // Need to create a new automatic style to hold those paragraph
+        // properties.
+        
+        ODe_Style_Style* pStyle;
+        pStyle = new ODe_Style_Style();
+        pStyle->setFamily("paragraph");
+        
+        pStyle->fetchAttributesFromAbiBlock(pAP, m_pCurrentListStyle);
+        
+        if (m_pendingMasterPageStyleChange) {
+            pStyle->setMasterPageName(m_masterPageStyleName);
+            m_pendingMasterPageStyleChange = false;
+            m_masterPageStyleName.clear();
+        }
+        
+        // Can't have both breaks
+        UT_ASSERT(
+            !(m_pendingColumnBrake==true && m_pendingPageBrake==true) );
+        
+        if (m_pendingColumnBrake) {
+            pStyle->setBreakBefore("column");
+            m_pendingColumnBrake = false;
+        }
+        
+        if (m_pendingPageBrake) {
+            pStyle->setBreakBefore("page");
+            m_pendingPageBrake = false;
+        }
+        
+        m_rAutomatiStyles.storeParagraphStyle(pStyle);
+        styleName = pStyle->getName();
+
+        // There is a special case for the default-tab-interval property, as in
+        // AbiWord that is a paragraph property, but in ODF it belongs in the
+        // default style for the "paragraph" family.
+        ok = pAP->getProperty("default-tab-interval", pValue);
+        if (ok && pValue != NULL) {
+            UT_DEBUGMSG(("Got a default tab interval:  !!!!!!!!!!!!! %s\n", pValue));
+        }
+            
+    }
+    else
+    {
+        UT_DEBUGMSG(("para styleB1:%s\n", styleName.utf8_str() ));
+        ok = pAP->getAttribute("style", pValue);
+        if (ok)
+        {
+            UT_DEBUGMSG(("para styleB2:%s\n", styleName.utf8_str() ));
+            styleName = pValue;
+        }
+        else
+        {
+            std::string s = UT_getLatestAttribute( pAP, "style", "Normal" );
+            UT_DEBUGMSG(("para styleB3 s:%s\n", s.c_str() ));
+            styleName = s;
+        }
+        
+    }
+    UT_DEBUGMSG(("para styleE:%s\n", styleName.utf8_str() ));
+    
+    
+    ////
+    // Write the output string
+    
+    m_spacesOffset += m_ctpParagraphAdditionalSpacesOffset;
+    _printSpacesOffset(output);
+    
+    if (styleName.empty())
+    {
+        output += "<text:p";
+        m_isHeadingParagraph = false;
+    }
+    else
+    {
+        UT_uint8 outlineLevel = 0;
+        
+        // Use the original AbiWord style name to see which outline level this
+        // style belongs to (if any). Don't use the generated ODT style for this,
+        // as that name is not what AbiWord based its decisions on.
+        //
+        {
+            // ok = pAP->getAttribute("style", pValue);
+            // if (ok) {
+            //     outlineLevel = m_rAuxiliaryData.m_headingStyles.
+            //         getHeadingOutlineLevel(pValue);
+            // }
+            std::string s = UT_getLatestAttribute( pAP, "style", "Normal" );
+            outlineLevel = m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel(s.c_str());
+        }
+        
+        if (outlineLevel > 0)
+        {
+            // It's a heading.
+            
+            UT_UTF8String_sprintf(str, "%u", outlineLevel);
+            
+            escape = styleName;
+            output += "<text:h text:style-name=\"";
+            output += ODe_Style_Style::convertStyleToNCName(escape).escapeXML();
+            output += "\" text:outline-level=\"";
+            output += str;
+            output += "\" ";
+            const char* xmlid = 0;
+            if( pAP->getAttribute( PT_XMLID, xmlid ) && xmlid )
+            {
+                appendAttribute( output, "xml:id", xmlid );
+            }
+            output += " ";
+            output += additionalElementAttributes;
+            m_isHeadingParagraph = true;
+            
+        }
+        else
+        {
+            // It's a regular paragraph.
+            escape = styleName;
+            output += "<text:p text:style-name=\"";
+            output += ODe_Style_Style::convertStyleToNCName(escape).escapeXML();
+            output += "\" ";
+            const char* xmlid = 0;
+            if( pAP->getAttribute( PT_XMLID, xmlid ) && xmlid )
+            {
+                appendAttribute( output, "xml:id", xmlid );
+            }
+            output += " ";
+            output += additionalElementAttributes;
+            
+            m_isHeadingParagraph = false;
+        }
+    }
+
+    if( const char* moveIDRef = UT_getAttribute( pAP, "delta:move-idref", 0 ))
+    {
+        output += " delta:move-idref=\"";
+        output += moveIDRef;
+        output += "\"";
+    }
+    
+    if( closeElementWithSlashGreaterThan )
+        output += "/>";
+    else
+        output += ">";
     
 }
 
@@ -1595,15 +1801,11 @@ ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
 void
 ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
 {
-	UT_UTF8String abiStyleName;
-    UT_UTF8String styleName;
     UT_UTF8String output;
-    UT_UTF8String str;
-    UT_UTF8String escape;
     const gchar* pValue;
     bool ok;
     std::stringstream ctpTextPEnclosingElementStream;
-    std::stringstream ctpTextPAttributesStream;
+    std::stringstream additionalElementAttributesStream;
     bool              wholeOfParagraphWasDeleted = false;
     bool              startOfParagraphWasDeleted = false;
     std::stringstream startOfParagraphWasDeletedPostamble;
@@ -1613,7 +1815,6 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
     m_ctpTextPEnclosingElementCloseStream.rdbuf()->str("");
     m_ctpParagraphAdditionalSpacesOffset = 0;
     std::stringstream paragraphSplitPostamble;
-    
 
     // PURE DEBUG BLOCK
     {
@@ -1635,9 +1836,10 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
             bool allDel   = ctp->getData().isParagraphDeleted();
             bool startDel = ctp->getData().isParagraphStartDeleted();
             
-            UT_DEBUGMSG(("ODTCT min:%d max:%d vrem:%d vadd:%d allDel:%d startDel:%d\n",
+            UT_DEBUGMSG(("ODTCT min:%d max:%d maxp:%d vrem:%d vadd:%d allDel:%d startDel:%d\n",
                          ctp->getData().m_minRevision,
                          ctp->getData().m_maxRevision,
+                         ctp->getData().m_maxParaRevision,
                          ctp->getData().getVersionWhichRemovesParagraph(),
                          ctp->getData().getVersionWhichIntroducesParagraph(),
                          allDel,
@@ -1645,6 +1847,20 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
         }
     }
 
+    // MIQ:FIXME:HACK: the mapping heading-1 -> outlinelevel is used to determine if something
+    // is a text:p or text:h but that mapping is only setup if there is a TOC
+    {
+        if( !m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel( "Heading 1" ))
+            m_rAuxiliaryData.m_headingStyles.addStyleName( "Heading 1", 1 );
+        if( !m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel( "Heading 2" ))
+            m_rAuxiliaryData.m_headingStyles.addStyleName( "Heading 2", 1 );
+        if( !m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel( "Heading 3" ))
+            m_rAuxiliaryData.m_headingStyles.addStyleName( "Heading 3", 1 );
+        if( !m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel( "Heading 4" ))
+            m_rAuxiliaryData.m_headingStyles.addStyleName( "Heading 4", 1 );
+        
+    }
+    
     //
     // write out style revisions, this has to handle the change
     // between text:p and text:h if the style changes as shown in
@@ -1663,24 +1879,134 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
     // </text:h>
     // <delta:remove-leaving-content-end delta:end-element-id='ee888'/>
     //
+    if( const char* revisionString = UT_getAttribute( pAP, "revision", 0 ))
     {
-        std::list< std::string > sl = convertRevisionStringToAttributeStack( pAP, "style", "Normal" );
-        for( stringlist_t::iterator si = sl.begin(); si != sl.end(); ++si )
+        //
+        // The "ra" and defaultAttrs objects must remain valid for this block
+        // as they are used in the ralist colleciton\
+        //
+        PP_RevisionAttr ra( revisionString );
+        int i = 0;
+        const gchar *ppAtts[50];
+        // NormalD, the default normal style.
+        ppAtts[i++] = "style";
+        ppAtts[i++] = "Normal";
+        ppAtts[i++] = 0;
+        PP_Revision defaultAttrs( 0, PP_REVISION_ADDITION, 0, ppAtts );
+        typedef std::list< const PP_Revision* > ralist_t;
+        ralist_t ralist;
+        const PP_Revision* r = 0;
+        std::string firstStyleAttribute = "";
+        
+        for( int raIdx = 0;
+             raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
+             raIdx++ )
         {
-            UT_DEBUGMSG(("ODTCT style stack:%s\n", si->c_str() ));
+            // only looking for style changes...
+            if( const char* style = UT_getAttribute( r, "style", 0 ))
+            {
+                ralist.push_back( r );
+                if( firstStyleAttribute.empty() )
+                    firstStyleAttribute = style;
+            }
+        }
+
+        //
+        // add the default attributes if they are not already on the stack.
+        //
+        if( ra.getRevisionsCount() )
+        {
+            if( firstStyleAttribute != "Normal" )
+            {
+                ralist.push_front( &defaultAttrs );
+            }
+        }
+        
+        // The last revision is the current one, so we remove that
+        // as it will be taken care of explicitly with the _openODParagraphToBuffer() call
+        // in the body of this method.
+        ralist.pop_back();
+
+        //
+        // loop over the older revisions (including the default starting state)
+        // and output the paragraph block element.
+        // 
+        for( ralist_t::iterator iter = ralist.begin(); iter != ralist.end(); ++iter )
+        {
+            const PP_Revision* r = *iter;
+            const gchar*  a =  r->getAttrsString();
+            UT_DEBUGMSG(("ODTCT revisions id:%d t:%d a:%s\n", r->getId(), r->getType(), a ));
+            UT_UTF8String o;
+            std::string additionalElementAttributes = "";
+            bool closeElementWithSlashGreaterThan = true;
+            
+            _openODParagraphToBuffer( r, o,
+                                      additionalElementAttributes,
+                                      closeElementWithSlashGreaterThan );
+            UT_DEBUGMSG(("ODTCT xml element:%s\n", o.utf8_str() ));
+
+            std::stringstream pre;
+            std::stringstream post;
+
+			std::string eeidref = m_cteeIDFactory.createId();
+            std::string rmChangeIdRef = m_rAuxiliaryData.toChangeID( r->getId() );
+            
+            pre << "<delta:remove-leaving-content-start delta:removal-change-idref=\""
+                << rmChangeIdRef  << "\""
+                << " delta:end-element-idref=\"" << eeidref << "\"" 
+                << ">" << endl;
+            pre << o.utf8_str();
+            pre << endl
+                << "</delta:remove-leaving-content-start>" << endl;
+            output += pre.str();
+            
+            post << "<delta:remove-leaving-content-end delta:end-element-id=\"" << eeidref << "\" />" << endl;
+            m_genericBlockClosePostambleList.push_front( post.str() );
+        }
+        
+        
+        // if( const char* revisionString = UT_getAttribute( pAP, "revision", 0 ))
+        // {
+        //     PP_RevisionAttr ra( revisionString );
+        //     const PP_Revision* r = 0;
+            
+        //     for( int raIdx = 0;
+        //          raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
+        //          raIdx++ )
+        //     {
+        //         const gchar*  a =  r->getAttrsString();
+        //         UT_DEBUGMSG(("ODTCT revisions idx:%d id:%d t:%d a:%s\n", raIdx, r->getId(), r->getType(), a ));
+
+        //         UT_UTF8String o;
+        //         std::string additionalElementAttributes = "";
+        //         bool closeElementWithSlashGreaterThan = true;
+                
+        //         _openODParagraphToBuffer( r, o,
+        //                                   additionalElementAttributes,
+        //                                   closeElementWithSlashGreaterThan );
+        //         UT_DEBUGMSG(("ODTCT xml element:%s\n", o.utf8_str() ));
+                
+        //     }
+        // }
+        
+        
+        // std::list< std::string > sl = convertRevisionStringToAttributeStack( pAP, "style", "Normal" );
+        // for( stringlist_t::iterator si = sl.begin(); si != sl.end(); ++si )
+        // {
+        //     UT_DEBUGMSG(("ODTCT style stack:%s\n", si->c_str() ));
 
             
 
-            // int outlineLevel = m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel(pValue);
-            // bool isHeading = (outlineLevel > 0);
+        //     // int outlineLevel = m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel(pValue);
+        //     // bool isHeading = (outlineLevel > 0);
 
-            // if( isHeading )
-            // {
-            // }
-            // else
-            // {
-            // }
-        }
+        //     // if( isHeading )
+        //     // {
+        //     // }
+        //     // else
+        //     // {
+        //     // }
+        // }
     }
     
     // if( const char* revisionString = UT_getAttribute( pAP, "revision", 0 ))
@@ -1766,10 +2092,12 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
                                                << "\"";
             }
             ctpTextPEnclosingElementStream << ">" << endl;
+            output += ctpTextPEnclosingElementStream.str();
+            
             m_ctpTextPEnclosingElementCloseStream << "</delta:removed-content>" << endl;
             m_ctpParagraphAdditionalSpacesOffset = 1;
 
-            ctpTextPAttributesStream << " delta:insertion-type=\"" << insType << "\" "
+            additionalElementAttributesStream << " delta:insertion-type=\"" << insType << "\" "
                                      << " delta:insertion-change-idref=\""
                                      << m_rAuxiliaryData.toChangeID( ctp->getData().getVersionWhichIntroducesParagraph())
                                      << "\" ";
@@ -1784,13 +2112,13 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
             {
                 if( strcmp( splitID, "0") )
                 {
-                    ctpTextPAttributesStream << "split:split01=\"" << splitID << "\" ";
+                    additionalElementAttributesStream << "split:split01=\"" << splitID << "\" ";
                 }
             }
             if( splitIDRef )
             {
                 insType = "split";
-                ctpTextPAttributesStream << "delta:split-id=\"" << splitIDRef << "\" ";
+                additionalElementAttributesStream << "delta:split-id=\"" << splitIDRef << "\" ";
             }
             
 
@@ -1816,7 +2144,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
             //     // {
             //     //     std::string splitID = "split1";
             //     //     insType = "split";
-            //     //     ctpTextPAttributesStream << "delta:split-id=\"" << splitID << "\" ";
+            //     //     additionalElementAttributesStream << "delta:split-id=\"" << splitID << "\" ";
             //     // }
             // }
             // else
@@ -1830,148 +2158,19 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
                 idref = ctp->getData().m_maxParaRevision;
             }
             
-            ctpTextPAttributesStream << " delta:insertion-type=\"" << insType << "\" "
-                                     << " delta:insertion-change-idref=\""
-                                     << m_rAuxiliaryData.toChangeID( idref )
-                                     << "\" ";
+            additionalElementAttributesStream << " delta:insertion-type=\"" << insType << "\" "
+                                              << " delta:insertion-change-idref=\""
+                                              << m_rAuxiliaryData.toChangeID( idref )
+                                              << "\" ";
         }
         
 
         // <delta:removed-content delta:removal-change-idref='ct456'>
         
     }
-    
-    ////
-    // Figure out the paragraph style
-    
-    if (ODe_Style_Style::hasParagraphStyleProps(pAP) ||
-        ODe_Style_Style::hasTextStyleProps(pAP) ||
-        m_pendingMasterPageStyleChange ||
-        m_pendingColumnBrake ||
-        m_pendingPageBrake) {
-            
-        // Need to create a new automatic style to hold those paragraph
-        // properties.
-        
-        ODe_Style_Style* pStyle;
-        pStyle = new ODe_Style_Style();
-        pStyle->setFamily("paragraph");
-        
-        pStyle->fetchAttributesFromAbiBlock(pAP, m_pCurrentListStyle);
-        
-        if (m_pendingMasterPageStyleChange) {
-            pStyle->setMasterPageName(m_masterPageStyleName);
-            m_pendingMasterPageStyleChange = false;
-            m_masterPageStyleName.clear();
-        }
-        
-        // Can't have both breaks
-        UT_ASSERT(
-            !(m_pendingColumnBrake==true && m_pendingPageBrake==true) );
-        
-        if (m_pendingColumnBrake) {
-            pStyle->setBreakBefore("column");
-            m_pendingColumnBrake = false;
-        }
-        
-        if (m_pendingPageBrake) {
-            pStyle->setBreakBefore("page");
-            m_pendingPageBrake = false;
-        }
-        
-        m_rAutomatiStyles.storeParagraphStyle(pStyle);
-        styleName = pStyle->getName();
 
-        // There is a special case for the default-tab-interval property, as in
-        // AbiWord that is a paragraph property, but in ODF it belongs in the
-        // default style for the "paragraph" family.
-        ok = pAP->getProperty("default-tab-interval", pValue);
-        if (ok && pValue != NULL) {
-            UT_DEBUGMSG(("Got a default tab interval:  !!!!!!!!!!!!! %s\n", pValue));
-        }
-            
-    } else {
-        ok = pAP->getAttribute("style", pValue);
-        if (ok) {
-            styleName = pValue;
-        }
-    }
+    _openODParagraphToBuffer( pAP, output, additionalElementAttributesStream.str(), startOfParagraphWasDeleted );
     
-    
-    ////
-    // Write the output string
-    
-    if( !ctpTextPEnclosingElementStream.str().empty() )
-    {
-        _printSpacesOffset(output);
-        output += ctpTextPEnclosingElementStream.str().c_str();
-    }
-    m_spacesOffset += m_ctpParagraphAdditionalSpacesOffset;
-    _printSpacesOffset(output);
-    
-    if (styleName.empty()) {
-        output += "<text:p";
-        m_isHeadingParagraph = false;
-    } else {
-        UT_uint8 outlineLevel = 0;
-        
-        // Use the original AbiWord style name to see which outline level this
-        // style belongs to (if any). Don't use the generated ODT style for this,
-        // as that name is not what AbiWord based its decisions on.
-        ok = pAP->getAttribute("style", pValue);
-        if (ok) {
-            outlineLevel = m_rAuxiliaryData.m_headingStyles.
-                            getHeadingOutlineLevel(pValue);
-        }
-        
-        if (outlineLevel > 0) {
-            // It's a heading.
-            
-            UT_UTF8String_sprintf(str, "%u", outlineLevel);
-            
-            escape = styleName;
-            output += "<text:h text:style-name=\"";
-            output += ODe_Style_Style::convertStyleToNCName(escape).escapeXML();
-            output += "\" text:outline-level=\"";
-            output += str;
-            output += "\" ";
-            const char* xmlid = 0;
-            if( pAP->getAttribute( PT_XMLID, xmlid ) && xmlid )
-            {
-                appendAttribute( output, "xml:id", xmlid );
-            }
-            m_isHeadingParagraph = true;
-            
-        } else {
-            // It's a regular paragraph.
-            escape = styleName;
-            output += "<text:p text:style-name=\"";
-            output += ODe_Style_Style::convertStyleToNCName(escape).escapeXML();
-            output += "\" ";
-            const char* xmlid = 0;
-            if( pAP->getAttribute( PT_XMLID, xmlid ) && xmlid )
-            {
-                appendAttribute( output, "xml:id", xmlid );
-            }
-            output += " ";
-            output += ctpTextPAttributesStream.str();
-            
-            m_isHeadingParagraph = false;
-        }
-    }
-
-    if( const char* moveIDRef = UT_getAttribute( pAP, "delta:move-idref", 0 ))
-    {
-        output += " delta:move-idref=\"";
-        output += moveIDRef;
-        output += "\"";
-    }
-    
-    if( startOfParagraphWasDeleted )
-        output += "/>";
-    else
-        output += ">";
-
     if( ctp &&
         ctp->getData().m_maxParaRevision > ctp->getData().getVersionWhichIntroducesParagraph() )
     {
@@ -2005,6 +2204,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
     
     output += paragraphSplitPostamble.str();
     output += startOfParagraphWasDeletedPostamble.str();
+    
     
     ////
     // Write output string to file and update related variables.

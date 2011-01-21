@@ -73,6 +73,7 @@
 #include "fd_Field.h"
 #include "pf_Frag_Strux.h"
 #include "fp_FootnoteContainer.h"
+#include <ut_conversion.h>
 
 #ifdef ENABLE_SPELL
 #include "spell_manager.h"
@@ -4521,6 +4522,26 @@ void FV_View::cmdCut(void)
 
 }
 
+
+// FIXME: copy from ODe_Text_Listener.cpp
+class ODFChangeTrackerIdFactory
+{
+    std::string m_prefix;
+    UT_uint32 m_id;
+public:
+    ODFChangeTrackerIdFactory( const char* prefix = "ctid-" ) : m_id(1) , m_prefix(prefix)
+    {
+    };
+    std::string createId()
+    {
+        std::string ret = m_prefix + tostr(m_id);
+        m_id++;
+        return ret;
+    }
+};
+static ODFChangeTrackerIdFactory m_ctmvIDFactory("mv");
+
+
 // bToClipboard is true if you want to copy to the CLIPBOARD
 // selection on UNIX, as opposed to some PRIMARY selection
 void FV_View::cmdCopy(bool bToClipboard)
@@ -4533,6 +4554,75 @@ void FV_View::cmdCopy(bool bToClipboard)
 
 	PD_DocumentRange dr;
 	getDocumentRangeOfCurrentSelection(&dr);
+
+	// For ODT Change Tracking we need to record a paragraph "move" source. 
+	bool revisionTracking = true;
+	if( revisionTracking )
+	{
+		PT_DocPosition pos = dr.m_pos1;
+		PL_StruxFmtHandle sfh;
+		PL_StruxDocHandle sdh;
+		PL_ListenerId listenerId = 0;
+		
+//		bool rc = m_pDoc->getStruxFromPosition( listenerId, pos, &sfh);
+		bool rc = m_pDoc->getStruxOfTypeFromPosition( pos, PTX_Block, &sdh);
+		UT_DEBUGMSG(("fv_View::cmdCopy: pos:%d rc:%d\n", pos, rc));
+		if( rc )
+		{
+			const char * pszValue = 0;
+//			PTStruxType type = m_pDoc->getStruxType( sfh );
+			rc = m_pDoc->getAttributeFromSDH( sdh, true, 0,
+											  "baz", &pszValue );
+			UT_DEBUGMSG(("fv_View::cmdCopy:2 pos:%d epos:%d rc:%d\n", pos, dr.m_pos2, rc));
+			if( rc )
+			{
+				UT_DEBUGMSG(("fv_View::cmdCopy:3 value:%s\n", pszValue ));
+				
+			}
+
+			std::string moveID = m_ctmvIDFactory.createId();
+			const gchar *  ppAtts[50];
+			const gchar ** properties = 0;
+			int i = 0;
+            ppAtts[i++] = "baz";
+            ppAtts[i++] = "updated";
+            ppAtts[i++] = "baz2";
+            ppAtts[i++] = "updated2";
+            ppAtts[i++] = "delta:move-id";
+            ppAtts[i++] = moveID.c_str();
+			ppAtts[i++] = 0;
+
+			m_pDoc->changeStruxAttsNoUpdate( sdh, "baz", "u2" );
+			m_pDoc->changeStruxAttsNoUpdate( sdh, "delta:move-id", moveID.c_str() );
+			
+			// rc = m_pDoc->changeStruxFmt( PTC_SetFmt,
+			// 							 dr.m_pos1, dr.m_pos2-1,
+			// 							 ppAtts, properties,
+			// 							 PTX_Block );
+
+//////////
+			
+			// pf_Frag * pf1 = m_pDoc->getFragFromPosition( dr.m_pos1 );
+			// if (pf1 != NULL)
+			// {
+			// 	// scan backwards for the block props of this span.
+			// 	while (pf1 != NULL)
+			// 	{
+			// 		if (pf1->getType() == pf_Frag::PFT_Strux)
+			// 		{
+			// 			PT_AttrPropIndex API = ((pf_Frag_Strux*)pf1)->getIndexAP();
+						
+			// 			break;
+			// 		}
+			// 		pf1 = pf1->getPrev();
+			// 	}
+			// }
+			
+
+			
+		}
+	}
+	
 	m_pApp->copyToClipboard(&dr, bToClipboard);
 	notifyListeners(AV_CHG_CLIPBOARD);
 }

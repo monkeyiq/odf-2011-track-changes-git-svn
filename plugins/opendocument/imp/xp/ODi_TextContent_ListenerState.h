@@ -30,6 +30,7 @@
 
 // Internal includes
 #include "ODi_ListenerState.h"
+#include "pp_Revision.h"
 
 // AbiWord includes
 #include <ut_types.h>
@@ -223,6 +224,29 @@ private:
     bool m_mergeIsInsideTrailingPartialContent;
     long m_paragraphNestingLevel;
     std::string m_ctRevisionIDBeforeMergeBlock;
+    std::string m_ctMoveID; // move-id for a delta:removed-content enclosure.
+
+    //
+    // stack of idrefs for delta:remove-leaving-content-start
+    std::list< std::pair< std::string, std::string > > m_ctRemoveLeavingContentStack;
+    //
+    // true if between the <delta:remove-leaving-content-start  ...>
+    // and </delta:remove-leaving-content-start> element. ie, we are to inspect the
+    // data for change tracking but not actually add these elements
+    // directly to the document
+    bool m_ctInsideRemoveLeavingContentStartElement;
+    
+    //
+    // A revision attribute which is built up inspecting one or more
+    // delta:remove-leaving-content-start elements proceeding a bare
+    // text:p or text:h element.
+    PP_RevisionAttr m_ctLeadingElementChangedRevision;
+
+    //
+    // Inspect ppParagraphAtts and build up m_ctLeadingElementChangedRevision
+    //
+    void handleRemoveLeavingContentStartForTextPH( const gchar* pName, const gchar** ppParagraphAtts );
+
 };
 
 #endif //_ODI_TEXTCONTENT_LISTENERSTATE_H_

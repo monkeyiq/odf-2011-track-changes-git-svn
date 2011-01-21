@@ -751,7 +751,7 @@ private:
 	bool HandleBookmark (RTFBookmarkType type);
 	bool HandleRDFAnchor (RTFBookmarkType type);
 	bool HandleListTag(long id);
-
+	bool HandleDeltaMoveID();
 	bool HandleRevisedText(PP_RevisionType eType, UT_uint32 iId);
 	bool HandleRevisedTextTimestamp(UT_uint32 iDttm);
 
@@ -989,6 +989,8 @@ private:
 	bool                  m_bFrameTextBox;
 	bool                  m_bParaActive;
 	bool                  m_bCellActive;
+
+	std::string           m_ctMoveID;
 };
 
 #endif /* IE_IMP_RTF_H */

@@ -75,9 +75,10 @@ UT_uint8 ODe_HeadingStyles::getHeadingOutlineLevel(
 /**
  * 
  */
-void ODe_HeadingStyles::addStyleName(const gchar* pStyleName,
-                                    UT_uint8 outlineLevel) {
-
+void ODe_HeadingStyles::addStyleName( const gchar* pStyleName,
+                                      UT_uint8 outlineLevel )
+{
+    UT_DEBUGMSG(("ODe_HeadingStyles::addStyleName n:%s level:%d\n", pStyleName, outlineLevel ));
     m_styleNames.addItem(new UT_UTF8String(pStyleName));
     m_outlineLevels.addItem(outlineLevel);
 }
@@ -98,7 +99,8 @@ ODe_ChangeTrackingParagraph_Data::updatePara( const PP_RevisionAttr* ra )
     m_maxDeletedRevision = 0;
 
     m_minDeletedRevision = 0;
-    
+    m_allSpansAreSameVersion = true;
+    m_lastSpanVersion = -1;
 }
 
 
@@ -119,7 +121,12 @@ ODe_ChangeTrackingParagraph_Data::update( const PP_RevisionAttr* ra )
         UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::update() iter:%d xid:%d type:%d\n",
                      iter, r->getId(), r->getType() ));
     }
+    if( last )
+    {
+        UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::update() lastID:%d\n", last->getId() ));
+    }
 
+                    
     // check if all spans are the same version
     if( m_allSpansAreSameVersion )
     {
