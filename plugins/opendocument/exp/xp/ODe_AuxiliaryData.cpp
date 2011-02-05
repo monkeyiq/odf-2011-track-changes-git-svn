@@ -42,6 +42,19 @@ ODe_AuxiliaryData::~ODe_AuxiliaryData() {
     deleteChangeTrackingParagraphData();
 }
 
+ODe_HeadingStyles::ODe_HeadingStyles()
+{
+    //
+    // The ODF exporter uses these to see if a style is
+    // a heading. ie, if outline > 0 then use text:h
+    //
+    addStyleName( "Heading 1", 1 );
+    addStyleName( "Heading 2", 1 );
+    addStyleName( "Heading 3", 1 );
+    addStyleName( "Heading 4", 1 );
+}
+
+
 /**
  * 
  */

@@ -204,6 +204,33 @@ ODi_TextContent_ListenerState::~ODi_TextContent_ListenerState()
 }
 
 
+std::string
+ODi_TextContent_ListenerState::convertODFStyleNameToAbiStyleName(
+    const std::string odfStyleName,
+    ODi_Office_Styles* pStyles,
+    bool bOnContentStream )
+{
+    UT_DEBUGMSG(("convertODFStyleNameToAbiStyleName() odfStyle:%s\n", odfStyleName.c_str() ));
+
+    std::string ret = odfStyleName;
+    // In ODe_Style_Style::convertStyleToNCName()
+    // a name like "Heading 1" is made "Heading-1"
+    // there is no reverse method there.
+    //
+    if( ret == "Heading-1" )
+        ret = "Heading 1";
+    if( ret == "Heading-2" )
+        ret = "Heading 2";
+    if( ret == "Heading-3" )
+        ret = "Heading 3";
+    if( ret == "Heading-4" )
+        ret = "Heading 4";
+    
+    UT_DEBUGMSG(("convertODFStyleNameToAbiStyleName(end) ret:%s\n", ret.c_str() ));
+    return ret;
+}
+
+
 void
 ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH(
     const gchar* pName,
@@ -219,6 +246,8 @@ ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH(
         UT_DEBUGMSG(("text:x INSIDE rlc-start element eeIDRef:%s\n", eeIDRef.c_str() ));
         UT_DEBUGMSG(("text:x style:%s\n", styleName.c_str() ));
 
+        convertODFStyleNameToAbiStyleName( styleName, m_pStyles, m_bOnContentStream );
+        
         if( styleName == "Heading-1" )
             styleName = "Heading 1";
         

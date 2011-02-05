@@ -1847,19 +1847,6 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
         }
     }
 
-    // MIQ:FIXME:HACK: the mapping heading-1 -> outlinelevel is used to determine if something
-    // is a text:p or text:h but that mapping is only setup if there is a TOC
-    {
-        if( !m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel( "Heading 1" ))
-            m_rAuxiliaryData.m_headingStyles.addStyleName( "Heading 1", 1 );
-        if( !m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel( "Heading 2" ))
-            m_rAuxiliaryData.m_headingStyles.addStyleName( "Heading 2", 1 );
-        if( !m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel( "Heading 3" ))
-            m_rAuxiliaryData.m_headingStyles.addStyleName( "Heading 3", 1 );
-        if( !m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel( "Heading 4" ))
-            m_rAuxiliaryData.m_headingStyles.addStyleName( "Heading 4", 1 );
-        
-    }
     
     //
     // write out style revisions, this has to handle the change

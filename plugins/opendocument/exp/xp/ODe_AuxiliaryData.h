@@ -47,9 +47,11 @@ class PP_RevisionAttr;
  * So, when translating an AbiWord paragraph, we must know wheter it will map
  * into an OpenDocument <text:p> or into a <text:h>.
  */
-class ODe_HeadingStyles {
+class ODe_HeadingStyles
+{
 public:
 
+    ODe_HeadingStyles();
     virtual ~ODe_HeadingStyles();
 
     /**

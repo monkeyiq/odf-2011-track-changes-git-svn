@@ -247,6 +247,11 @@ private:
     //
     void handleRemoveLeavingContentStartForTextPH( const gchar* pName, const gchar** ppParagraphAtts );
 
+    std::string convertODFStyleNameToAbiStyleName( const std::string odfStyleName,
+                                                   ODi_Office_Styles* pStyles,
+                                                   bool bOnContentStream );
+    
+    
 };
 
 #endif //_ODI_TEXTCONTENT_LISTENERSTATE_H_
