@@ -40,8 +40,31 @@ ODe_ChangeTrackingParagraph_Listener::ODe_ChangeTrackingParagraph_Listener(
                                     : m_rStyles(rStyles)
                                     , m_rAuxiliaryData(rAuxiliaryData)
                                     , m_current(0)
+                                    , m_foundIntermediateContent(false)
 {
 }
+
+void
+ODe_ChangeTrackingParagraph_Listener::openTable(const PP_AttrProp* pAP, ODe_ListenerAction& rAction)
+{
+    UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Listener::openTable()\n"));
+    m_foundIntermediateContent = true;
+}
+
+void
+ODe_ChangeTrackingParagraph_Listener::closeTable(ODe_ListenerAction& rAction)
+{
+    UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Listener::closeTable()\n"));
+    
+}
+
+void
+ODe_ChangeTrackingParagraph_Listener::openSection( const PP_AttrProp* pAP, ODe_ListenerAction& rAction )
+{
+    UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Listener::openSection()\n"));
+    m_foundIntermediateContent = true;
+}
+
 
 
 void
@@ -58,8 +81,9 @@ ODe_ChangeTrackingParagraph_Listener::openBlock( const PP_AttrProp* pAP,
         if( const PP_Revision* last = ra.getLastRevision() )
             UT_DEBUGMSG(("ODe_CTPara_Listener::openBlock() last-revision-number:%d\n", last->getId() ));
 
-        m_current->getData().update( &ra );
+        m_current->getData().update( &ra, getCurrentDocumentPosition() );
         m_current->getData().updatePara( &ra );
+        m_current->getData().m_foundIntermediateContent = m_foundIntermediateContent;
     }
 
     if( pAP->getAttribute(PT_CHANGETRACKING_SPLIT_ID, pValue))
@@ -74,6 +98,7 @@ ODe_ChangeTrackingParagraph_Listener::closeBlock()
     UT_DEBUGMSG(("ODe_CTPara_Listener::closeBlock() pos:%d\n",getCurrentDocumentPosition()));
     m_current->setEndPosition(getCurrentDocumentPosition());
     m_current = 0;
+    m_foundIntermediateContent = false;
 }
 
 void
@@ -92,7 +117,7 @@ ODe_ChangeTrackingParagraph_Listener::openSpan( const PP_AttrProp* pAP )
         if( const PP_Revision* last = ra.getLastRevision() )
             UT_DEBUGMSG(("ODe_CTPara_Listener::openSpan() last-revision-number:%d\n", last->getId() ));
 
-        m_current->getData().update( &ra );
+        m_current->getData().update( &ra, getCurrentDocumentPosition() );
     }
     
     

@@ -209,48 +209,69 @@ private:
     bool m_bContentWritten;
 
 
-    // ODT Change Tracking
-    UT_uint32 m_ctParagraphDeletedRevision;
-    // <delta:inserted-text-start ... <delta:inserted-text-end
-    // stack contains the text-id
-    typedef std::list< std::string > m_ctInsertedTextStack_t;
-    m_ctInsertedTextStack_t m_ctInsertedTextStack;
-    std::string m_ctMostRecentWritingVersion; //< Version of last text:p or insert-text
-    bool m_ctHaveSpanFmt;       //< inside a text:span
-    bool m_ctHaveParagraphFmt;  //< inside a text:p which has ct data
-    long m_ctSpanDepth;         //< count of current text:span nesting
+    /*************************************
+     * ODT Change Tracking
+     */
+    UT_sint32 m_ctParagraphDeletedRevision; //< version at which the whole paragraph was deleted 
+    bool m_ctHaveSpanFmt;                   //< inside a text:span
+    bool m_ctHaveParagraphFmt;              //< inside a text:p which has ct data
+    long m_ctSpanDepth;                     //< count of current text:span nesting
 
-    std::string m_mergeIDRef;
-    bool m_mergeIsInsideTrailingPartialContent;
-    long m_paragraphNestingLevel;
-    std::string m_ctRevisionIDBeforeMergeBlock;
-    std::string m_ctMoveID; // move-id for a delta:removed-content enclosure.
+    std::string m_mergeIDRef;                   //< delta:merge@removal-change-idref
+    bool m_mergeIsInsideTrailingPartialContent; //< true when inside a delta:merge/delta:trailing-partial-content element
+    bool m_mergeIsInsideIntermediateContent;    //< true when inside a delta:merge/delta:intermediate-content element
+    long m_paragraphNestingLevel;               //< incremented on paragraph start, decremented on close
+    std::string m_ctRevisionIDBeforeMergeBlock; //< text:p@insertion-change-idref
+    std::string m_ctMoveID;                     //< delta:removed-content@move-id when inside delta:removed-content enclosure.
 
+    //
+    // Stack of delta:inserted-text-start / delta:removed-content to manage the ADD/DEL
+    // revision operations. A stack is useful here for cases like
+    // in r1 you add "this is the text"
+    // in r2 you del "this xxxxxx text"
+    // in r3 you add "this FOOxxxxxx text"
+    // to get        "<ins r1>this <ins r3>FOO</ins r3><del r2>xxxx</del r2> text</ins r1>"
+    // 
+    // with a stack the presence of <ins r3> is handled and the del r2 will know it was
+    // inserted originally in r1.
+    // Inserted text is simpler because it only needs to check for an enclosing deletion
+    //
+    typedef std::list< std::pair< PP_RevisionType, std::string > > m_ctAddRemoveStack_t;
+    m_ctAddRemoveStack_t m_ctAddRemoveStack;
+    PP_RevisionAttr& ctAddRemoveStackSetup( PP_RevisionAttr& ra, m_ctAddRemoveStack_t& stack );
+    std::string ctAddRemoveStackGetLast( PP_RevisionType t );
+    
     //
     // stack of idrefs for delta:remove-leaving-content-start
     std::list< std::pair< std::string, std::string > > m_ctRemoveLeavingContentStack;
     //
     // true if between the <delta:remove-leaving-content-start  ...>
     // and </delta:remove-leaving-content-start> element. ie, we are to inspect the
-    // data for change tracking but not actually add these elements
-    // directly to the document
+    // data for change tracking metadata using handleRemoveLeavingContentStartForTextPH()
+    // but not actually add the normal text:p/text:h elements directly to the document
     bool m_ctInsideRemoveLeavingContentStartElement;
-    
-    //
-    // A revision attribute which is built up inspecting one or more
-    // delta:remove-leaving-content-start elements proceeding a bare
-    // text:p or text:h element.
-    PP_RevisionAttr m_ctLeadingElementChangedRevision;
-
     //
     // Inspect ppParagraphAtts and build up m_ctLeadingElementChangedRevision
     //
     void handleRemoveLeavingContentStartForTextPH( const gchar* pName, const gchar** ppParagraphAtts );
+    
+    //
+    // A revision attribute which is built up inspecting one or more
+    // delta:remove-leaving-content-start elements proceeding a raw
+    // text:p or text:h element.
+    PP_RevisionAttr m_ctLeadingElementChangedRevision;
 
+    //
+    // ODF styles for headings are slightly different to those
+    // for Abiword abw format, this method should convert to an abiword
+    // style if one can be worked out.
     std::string convertODFStyleNameToAbiStyleName( const std::string odfStyleName,
                                                    ODi_Office_Styles* pStyles,
                                                    bool bOnContentStream );
     
+    /*************************************
+     * Some other stuff
+     */
     
 };
 

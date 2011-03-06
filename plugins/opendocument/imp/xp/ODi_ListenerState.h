@@ -29,6 +29,7 @@
 // Internal classes
 class ODi_ListenerStateAction;
 class ODi_ElementStack;
+class PP_RevisionAttr;
 
 
 /**
@@ -52,6 +53,11 @@ public:
     virtual void charData (const gchar* pBuffer, int length) = 0;
     
     const UT_String& getStateName() const {return m_stateName;}
+
+    UT_uint32 getImplicitRemovalVersion();
+    void updateToHandleRemovalVersion( PP_RevisionAttr& r );
+
+    UT_uint32 fromChangeID( const std::string s );
     
 protected:
 

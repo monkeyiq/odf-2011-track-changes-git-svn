@@ -559,6 +559,8 @@ void ODe_AbiDocListener::finished() {
     _closeTable();
     
     _closeSection();
+    UT_DEBUGMSG(("ODe_AbiDocListener::finished()\n"));
+
 }
 
 

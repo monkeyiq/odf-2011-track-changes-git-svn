@@ -179,11 +179,12 @@ ODi_TextContent_ListenerState::ODi_TextContent_ListenerState (
                   m_prevLevel(0),
                   m_bContentWritten(false)
                 , m_ctParagraphDeletedRevision(-1)
-                , m_ctMostRecentWritingVersion("")
+//                , m_ctMostRecentWritingVersion("")
                 , m_ctHaveSpanFmt(false)
                 , m_ctHaveParagraphFmt(false)
                 , m_ctSpanDepth(0)
                 , m_mergeIsInsideTrailingPartialContent(false)
+                , m_mergeIsInsideIntermediateContent(false)
                 , m_paragraphNestingLevel(0)
                 , m_ctInsideRemoveLeavingContentStartElement(false)
 {
@@ -267,7 +268,7 @@ ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH(
         propertyArray<> ppAtts;
         ppAtts.push_back( "style" );
         ppAtts.push_back( styleName.c_str() );
-        m_ctLeadingElementChangedRevision.addRevision( toType<UT_uint32>(chIDRef),
+        m_ctLeadingElementChangedRevision.addRevision( fromChangeID(chIDRef),
                                                        PP_REVISION_FMT_CHANGE, // PP_REVISION_ADDITION,
                                                        ppAtts.data(), pProps );
         UT_DEBUGMSG(("text:x rev:%s\n", m_ctLeadingElementChangedRevision.getXMLstring() ));
@@ -362,17 +363,53 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
         std::string idref = UT_getAttribute("delta:removal-change-idref", ppAtts, "");
         m_mergeIDRef = idref;
         m_mergeIsInsideTrailingPartialContent = false;
+        m_mergeIsInsideIntermediateContent = false;
     }
     else if (!strcmp(pName, "delta:leading-partial-content" ))
     {
+        UT_DEBUGMSG(("delta:leading-partial-content (start)\n" ));
+
+        _flush ();
+        _popInlineFmt();
+        m_pAbiDocument->appendFmt(&m_vecInlineFmt);
+
+        PP_RevisionAttr ctRevision;
+        const gchar ** pAttrs = 0;
+        const gchar ** pProps = 0;
+        ctRevision.addRevision( fromChangeID(m_mergeIDRef),
+                                PP_REVISION_DELETION,
+                                pAttrs, pProps );
+
+        if( strlen(ctRevision.getXMLstring()) )
+        {
+            if( strcmp(ctRevision.getXMLstring(),"0"))
+            {
+                UT_DEBUGMSG(("delta:revision:%s\n", ctRevision.getXMLstring()));
+                const gchar* ppAtts[10];
+                bzero(ppAtts, 10 * sizeof(gchar*));
+                int i=0;
+                ppAtts[i++] = PT_REVISION_ATTRIBUTE_NAME;
+                ppAtts[i++] = ctRevision.getXMLstring();
+                ppAtts[i++] = "baz";
+                ppAtts[i++] = "updated3";
+                ppAtts[i++] = 0;
+                m_ctHaveParagraphFmt = true;
+                _pushInlineFmt(ppAtts);
+                bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
+                UT_ASSERT(ok);
+            }
+        }
         
     }
     else if (!strcmp(pName, "delta:intermediate-content" ))
     {
+        UT_DEBUGMSG(("delta:intermediate-content (start)\n" ));
+        m_mergeIsInsideIntermediateContent = true;
         
     }
     else if (!strcmp(pName, "delta:trailing-partial-content" ))
     {
+        UT_DEBUGMSG(("delta:trailing-partial-content (start)\n" ));
         m_mergeIsInsideTrailingPartialContent = true;
     }
     else if (!strcmp(pName, "text:p" ))
@@ -549,18 +586,21 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
 
     } else if (!strcmp(pName, "delta:removed-content" )) {
 
+        UT_DEBUGMSG(("delta:removed-content opening...\n"));
+        
         std::string ctTextID = UT_getAttribute("delta:removed-text-id", ppAtts, "" );
         std::string idref    = UT_getAttribute("delta:removal-change-idref", ppAtts, "");
         std::string moveID   = UT_getAttribute("delta:move-id", ppAtts, "" );
 
         m_ctMoveID = moveID;
-
+        m_ctAddRemoveStack.push_back( make_pair( PP_REVISION_DELETION, idref ));
+        
         if( ctTextID.empty() )
         {
             //
             // The paragraph itself has been deleted.
             //
-            m_ctParagraphDeletedRevision = toType<UT_uint32>(idref);
+            m_ctParagraphDeletedRevision = fromChangeID(idref);
             UT_DEBUGMSG(("DELETE paraRevision:%s\n", idref.c_str() ));
 
             if( !moveID.empty() )
@@ -582,27 +622,29 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
             _flush ();
 
             PP_RevisionAttr ctRevision;
-        
-            UT_DEBUGMSG(("delta:removed-content-start tid:%s idref:%s m_ctMostRecentWritingVersion:%s\n", ctTextID.c_str(), idref.c_str(), m_ctMostRecentWritingVersion.c_str() ));
-            UT_DEBUGMSG(("delta:removed-content-start added in revision:%s removed in:%s\n",
-                         m_ctMostRecentWritingVersion.c_str(), idref.c_str()  ));
-            if( !m_ctMostRecentWritingVersion.empty() )
-            {
-                UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
-            
-                const gchar ** pAttrs = 0;
-                const gchar ** pProps = 0;
-                ctRevision.addRevision( toType<UT_uint32>(m_ctMostRecentWritingVersion),
-                                        PP_REVISION_ADDITION,
-                                        pAttrs, pProps );
-            }
 
-            UT_DEBUGMSG(("ODTCT ctRevision.addRevision() del rev:%s\n", idref.c_str() ));
-            const gchar ** pAttrs = 0;
-            const gchar ** pProps = 0;
-            ctRevision.addRevision( toType<UT_uint32>(idref),
-                                    PP_REVISION_DELETION,
-                                    pAttrs, pProps );
+            UT_DEBUGMSG(("delta:removed-content-start tid:%s idref:%s\n", ctTextID.c_str(), idref.c_str() ));
+            ctAddRemoveStackSetup( ctRevision, m_ctAddRemoveStack );
+            
+//            UT_DEBUGMSG(("delta:removed-content-start added in revision:%s removed in:%s\n",
+//                         m_ctMostRecentWritingVersion.c_str(), idref.c_str()  ));
+            // if( !m_ctMostRecentWritingVersion.empty() )
+            // {
+            //     UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
+            
+            //     const gchar ** pAttrs = 0;
+            //     const gchar ** pProps = 0;
+            //     ctRevision.addRevision( fromChangeID(m_ctMostRecentWritingVersion),
+            //                             PP_REVISION_ADDITION,
+            //                             pAttrs, pProps );
+            // }
+
+            // UT_DEBUGMSG(("ODTCT ctRevision.addRevision() del rev:%s\n", idref.c_str() ));
+            // const gchar ** pAttrs = 0;
+            // const gchar ** pProps = 0;
+            // ctRevision.addRevision( fromChangeID(idref),
+            //                         PP_REVISION_DELETION,
+            //                         pAttrs, pProps );
 
             if( strlen(ctRevision.getXMLstring()) )
             {
@@ -617,32 +659,22 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                     bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
                     UT_ASSERT(ok);
                     m_ctSpanDepth++;
-                
-                
-                    // const gchar* ppAtts[10];
-                    // bzero(ppAtts, 10 * sizeof(gchar*));
-                    // int i=0;
-                    // ppAtts[i++] = PT_REVISION_ATTRIBUTE_NAME;
-                    // ppAtts[i++] = ctRevision.getXMLstring();
-                    // ppAtts[i++] = 0;
-                    // _pushInlineFmt(ppAtts);
-                    // bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
-                    // UT_ASSERT(ok);
-                    // m_ctSpanDepth++;
                 }
             }
         }
     }
     else if (!strcmp(pName, "delta:inserted-text-start"))
     {
-
+        UT_DEBUGMSG(("delta:inserted-text-start charData.sz:%d acceptingText:%d\n",
+                     m_charData.size(), m_bAcceptingText ));
         _flush ();
         
         std::string ctTextID = UT_getAttribute("delta:inserted-text-id", ppAtts, "" );
         std::string idref    = UT_getAttribute("delta:insertion-change-idref", ppAtts, "" );
         PP_RevisionAttr ctRevision;
 
-        m_ctMostRecentWritingVersion = idref;
+//        m_ctMostRecentWritingVersion = idref;
+        m_ctAddRemoveStack.push_back( make_pair( PP_REVISION_ADDITION, idref ));
         
         UT_DEBUGMSG(("delta:inserted-text-start tid:%s idref:%s\n", ctTextID.c_str(), idref.c_str()));
         UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", idref.c_str() ));
@@ -650,16 +682,25 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
         const gchar ** pProps = 0;
         if( !idref.empty() )
         {
-            ctRevision.addRevision( toType<UT_uint32>(idref),
+            ctRevision.addRevision( fromChangeID(idref),
                                     PP_REVISION_ADDITION,
                                     pAttrs, pProps );
         }
         else
         {
-            ctRevision.addRevision( toType<UT_uint32>(ctTextID),
+            ctRevision.addRevision( fromChangeID(ctTextID),
                                     PP_REVISION_ADDITION,
                                     pAttrs, pProps );
         }
+        if( const ODi_StartTag* st = m_rElementStack.getClosestElement( "delta:removed-content" ))
+        {
+            if( const char* v = st->getAttributeValue( "delta:removal-change-idref" ))
+            {
+                ctRevision.addRevision( fromChangeID(v),
+                                        PP_REVISION_DELETION, pAttrs, pProps );
+            }
+        }
+        
         
         if( strlen(ctRevision.getXMLstring()) )
         {
@@ -678,14 +719,20 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
             }
         }
 
-    } else if (!strcmp(pName, "delta:inserted-text-end")) {
+    }
+    else if (!strcmp(pName, "delta:inserted-text-end"))
+    {
 
         UT_DEBUGMSG(("delta:inserted-text-end\n"));
         _flush ();
         _popInlineFmt();
         m_pAbiDocument->appendFmt(&m_vecInlineFmt);
+        if( !m_ctAddRemoveStack.empty() )
+            m_ctAddRemoveStack.pop_back();
 
-    } else if (!strcmp(pName, "text:span")) {
+    }
+    else if (!strcmp(pName, "text:span"))
+    {
 
         // Write all text that is between the last element tag and this
         // <text:span>
@@ -699,18 +746,19 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                 _popInlineFmt();
                 m_pAbiDocument->appendFmt(&m_vecInlineFmt);
             }
-        
+
+            std::string ctMostRecentWritingVersion = ctAddRemoveStackGetLast( PP_REVISION_ADDITION );
             PP_RevisionAttr ctRevision;
             {
                 const gchar* x = UT_getAttribute("delta:insertion-change-idref", ppAtts);
                 UT_DEBUGMSG(("ODTCT ctRevision.addRevision() t:span add explicit:%s mrw:%s\n",
-                             x, m_ctMostRecentWritingVersion.c_str() ));
+                             x, ctMostRecentWritingVersion.c_str() ));
                 if( !x )
-                    x = m_ctMostRecentWritingVersion.c_str();
+                    x = ctMostRecentWritingVersion.c_str();
                 
                 const gchar ** pAttrs = 0;
                 const gchar ** pProps = 0;
-                ctRevision.addRevision( toType<UT_uint32>(x),
+                ctRevision.addRevision( fromChangeID(x),
                                         PP_REVISION_ADDITION, pAttrs, pProps );
             }
             
@@ -1174,6 +1222,8 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
        rAction.ignoreElement();  // ignore drawing shapes since AbiWord can't handle them
 
     } else if (!strcmp(pName, "table:table")) {
+
+        m_ctParagraphDeletedRevision = -1;
         _insureInSection();
         rAction.pushState("Table");
         
@@ -1354,13 +1404,17 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
     {
 
         UT_DEBUGMSG(("delta:merge (end)\n" ));
+        UT_DEBUGMSG(("delta:merge (end) charData.sz:%d acceptingText:%d\n",
+                     m_charData.size(), m_bAcceptingText ));
         m_mergeIDRef = "";
         m_ctRevisionIDBeforeMergeBlock = "";
+        m_bAcceptingText = true;
     }
     else if (!strcmp(pName, "delta:leading-partial-content" ))
     {
         UT_DEBUGMSG(("delta:leading-partial-content (end)\n" ));
 
+        _flush ();
         if( m_ctHaveParagraphFmt )
         {
             _popInlineFmt();
@@ -1368,10 +1422,16 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
         }
         _endParagraphElement("text:p", rAction);
     }
+    else if (!strcmp(pName, "delta:intermediate-content" ))
+    {
+        m_mergeIsInsideIntermediateContent = false;
+    }
     else if (!strcmp(pName, "delta:trailing-partial-content" ))
     {
         m_mergeIsInsideTrailingPartialContent = false;
         UT_DEBUGMSG(("delta:trailing-partial-content (end) idbeforeBlock:%s\n", m_ctRevisionIDBeforeMergeBlock.c_str() ));
+        UT_DEBUGMSG(("delta:trailing-partial-content (end) charData.sz:%d acceptingText:%d\n",
+                     m_charData.size(), m_bAcceptingText ));
 
 //         if( !m_ctRevisionIDBeforeMergeBlock.empty() )
 //         {
@@ -1400,8 +1460,12 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
     }
     else if (!strcmp(pName, "delta:removed-content"))
     {
+        UT_DEBUGMSG(("delta:removed-content closing this:%p\n",(void*)this));
+        UT_DEBUGMSG(("ctParagraphDeletedRevision:%d\n", m_ctParagraphDeletedRevision ));
 
-        UT_DEBUGMSG(("delta:removed-content closing\n"));
+        if( !m_ctAddRemoveStack.empty() )
+            m_ctAddRemoveStack.pop_back();
+        
         _flush ();
         _popInlineFmt();
         m_pAbiDocument->appendFmt(&m_vecInlineFmt);
@@ -1411,13 +1475,15 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
         {
             {
                 PP_RevisionAttr ctRevision;
-                {
-                    UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
-                    const gchar ** pAttrs = 0;
-                    const gchar ** pProps = 0;
-                    ctRevision.addRevision( toType<UT_uint32>(m_ctMostRecentWritingVersion),
-                                            PP_REVISION_ADDITION, pAttrs, pProps );
-                }
+                ctAddRemoveStackSetup( ctRevision, m_ctAddRemoveStack );
+                
+                // {
+                //     UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
+                //     const gchar ** pAttrs = 0;
+                //     const gchar ** pProps = 0;
+                //     ctRevision.addRevision( fromChangeID(m_ctMostRecentWritingVersion),
+                //                             PP_REVISION_ADDITION, pAttrs, pProps );
+                // }
             
                 if( strcmp( ctRevision.getXMLstring(), "0" ))
                 {
@@ -1451,10 +1517,17 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
         UT_DEBUGMSG(("text:p ending .. m_ctHaveParagraphFmt:%d\n", m_ctHaveParagraphFmt ));
         bool reallyEndParagraph = true;
         
-        if( !m_mergeIDRef.empty() )
+        if( !m_mergeIDRef.empty() ) // FIXME: dont do this if inside intermediate-content
         {
             UT_DEBUGMSG(("text:p ending inside mergeID:%s\n", m_mergeIDRef.c_str() ));
-            reallyEndParagraph = false;
+            if( m_mergeIsInsideIntermediateContent )
+            {
+            }
+            else
+            {
+                reallyEndParagraph = false;
+                m_bAcceptingText = false;
+            }
         }
         
         if( reallyEndParagraph )
@@ -1488,13 +1561,14 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
         {
             {
                 PP_RevisionAttr ctRevision;
-                {
-                    UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
-                    const gchar ** pAttrs = 0;
-                    const gchar ** pProps = 0;
-                    ctRevision.addRevision( toType<UT_uint32>(m_ctMostRecentWritingVersion),
-                                            PP_REVISION_ADDITION, pAttrs, pProps );
-                }
+                ctAddRemoveStackSetup( ctRevision, m_ctAddRemoveStack );
+                // {
+                //     UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
+                //     const gchar ** pAttrs = 0;
+                //     const gchar ** pProps = 0;
+                //     ctRevision.addRevision( fromChangeID(m_ctMostRecentWritingVersion),
+                //                             PP_REVISION_ADDITION, pAttrs, pProps );
+                // }
             
                 if( strcmp( ctRevision.getXMLstring(), "0" ))
                 {
@@ -1789,11 +1863,14 @@ void ODi_TextContent_ListenerState::_insertBookmark (const gchar* pName,
  */
 void ODi_TextContent_ListenerState::_flush ()
 {
-    if (m_charData.size () > 0 && m_bAcceptingText) {
+    if (m_charData.size () > 0 && m_bAcceptingText)
+    {
+        UT_DEBUGMSG(("flush() data:%s\n", m_charData.utf8_str() ));
+        
         m_pAbiDocument->appendSpan (m_charData.ucs4_str(), m_charData.size ());
         m_charData.clear ();
-	m_bContentWritten = true;
-    } 
+        m_bContentWritten = true;
+    }
 }
 
 
@@ -2145,6 +2222,7 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         std::string ctMoveIDRef            = UT_getAttribute("delta:move-idref", ppParagraphAtts, "" );
         PP_RevisionAttr ctRevision = m_ctLeadingElementChangedRevision;
 
+        
         // DEBUG BLOCK
         {
             UT_DEBUGMSG(("ODTCT _startParagraphElement()\n"));
@@ -2155,6 +2233,8 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             UT_DEBUGMSG(("ODTCT ctSplitIDRef:%s\n", ctSplitIDRef.c_str() ));
             UT_DEBUGMSG(("ODTCT ctMoveIDRef:%s\n",  ctMoveIDRef.c_str() ));
             UT_DEBUGMSG(("ODTCT m_ctMoveID:%s\n",   m_ctMoveID.c_str() ));
+            UT_DEBUGMSG(("ODTCT m_mergeIsInsideIntermediateContent:%d\n",   m_mergeIsInsideIntermediateContent ));
+            UT_DEBUGMSG(("ODTCT charData:%s\n",     m_charData.utf8_str() ));
 
             UT_DEBUGMSG(("ODTCT delta:insertion-change-idref:%s\n",
                          UT_getAttribute("delta:insertion-change-idref",  ppParagraphAtts, "" )));
@@ -2170,6 +2250,11 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
                 m_ctRevisionIDBeforeMergeBlock = ctInsertionChangeIDRef;
             }
         }
+
+        //
+        // maintain stack of insert/delete operations
+        //
+        m_ctAddRemoveStack.push_back( make_pair( PP_REVISION_ADDITION, ctInsertionChangeIDRef ));
         
 
         if( ctInsertionType == "insert-with-content" || ctInsertionType == "split" )
@@ -2179,27 +2264,33 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
                 UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add startparaA rev:%s\n", ctInsertionChangeIDRef.c_str() ));
                 const gchar ** pAttrs = 0;
                 const gchar ** pProps = 0;
-                ctRevision.addRevision( toType<UT_uint32>(ctInsertionChangeIDRef),
+                ctRevision.addRevision( fromChangeID(ctInsertionChangeIDRef),
                                         PP_REVISION_ADDITION, pAttrs, pProps );
-                m_ctMostRecentWritingVersion = ctInsertionChangeIDRef;
+//                m_ctMostRecentWritingVersion = ctInsertionChangeIDRef;
             }
         }
         if( m_ctParagraphDeletedRevision != -1 )
         {
-            UT_DEBUGMSG(("ODTCT ctRevision.addRevision() del startpara rev:%d\n", m_ctParagraphDeletedRevision ));
+            UT_DEBUGMSG(("ODTCT ctRevision.addRevision() del startpara1 rev:%d\n", m_ctParagraphDeletedRevision ));
             const gchar ** pAttrs = 0;
             const gchar ** pProps = 0;
-            ctRevision.addRevision( m_ctParagraphDeletedRevision,
-                                    PP_REVISION_DELETION, pAttrs, pProps );
+//            ctRevision.addRevision( m_ctParagraphDeletedRevision,
+//                                    PP_REVISION_DELETION, pAttrs, pProps );
         }
         if( !m_mergeIDRef.empty() )
         {
             UT_DEBUGMSG(("ODTCT ctRevision.addRevision() merge del startpara rev:%s\n",
                          m_mergeIDRef.c_str() ));
-            const gchar ** pAttrs = 0;
-            const gchar ** pProps = 0;
-            ctRevision.addRevision( toType<UT_uint32>(m_mergeIDRef),
-                                    PP_REVISION_DELETION, pAttrs, pProps );
+            if( m_mergeIsInsideIntermediateContent )
+            {
+            }
+            else
+            {
+                const gchar ** pAttrs = 0;
+                const gchar ** pProps = 0;
+                ctRevision.addRevision( fromChangeID(m_mergeIDRef),
+                                        PP_REVISION_DELETION, pAttrs, pProps );
+            }
         }
         
         UT_DEBUGMSG(("paraRevision:%s\n", ctRevision.getXMLstring() ));
@@ -2226,16 +2317,21 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             // Use the default style
             pStyle = m_pStyles->getDefaultParagraphStyle();
         }
-        UT_DEBUGMSG(("para:style:%s\n", pStyle->getDisplayName().utf8_str() ));
+
+        if( pStyle )
+            UT_DEBUGMSG(("para:style:%s\n", pStyle->getDisplayName().utf8_str() ));
         UT_DEBUGMSG(("ctInsertionChangeIDRef:%s\n", ctInsertionChangeIDRef.c_str() ));
 
         // push the paragraph style onto the revisions
-        if( strlen( pStyle->getDisplayName().utf8_str() )
+        if( (pStyle && strlen( pStyle->getDisplayName().utf8_str() ))
             && !ctInsertionChangeIDRef.empty() )
         {
             std::string id = ctInsertionChangeIDRef;
 
             UT_DEBUGMSG(("ctRevision.getXMLstring(before):%s\n", ctRevision.getXMLstring() ));
+            UT_DEBUGMSG(("pStyle:%s\n", pStyle->getDisplayName().utf8_str() ));
+            UT_DEBUGMSG(("id:%s\n", id.c_str() ));
+            UT_DEBUGMSG(("leading style:%s\n", m_ctLeadingElementChangedRevision.getXMLstring() ));
 
             if( !strcmp( pStyle->getDisplayName().utf8_str(), "Normal" )
                 && !strlen(m_ctLeadingElementChangedRevision.getXMLstring()) )
@@ -2248,7 +2344,7 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
                 propertyArray<> ppAtts;
                 ppAtts.push_back( "style" );
                 ppAtts.push_back( pStyle->getDisplayName().utf8_str() );
-                ctRevision.addRevision( toType<UT_uint32>(id),
+                ctRevision.addRevision( fromChangeID(id),
                                         PP_REVISION_FMT_CHANGE,
                                         ppAtts.data(), pProps );
             }
@@ -2531,17 +2627,18 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         // handle revision information
         {
             
+            std::string ctMostRecentWritingVersion = ctAddRemoveStackGetLast( PP_REVISION_ADDITION );
             PP_RevisionAttr ctRevision;
             {
-                UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add startpara rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
+                UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add startpara rev:%s\n", ctMostRecentWritingVersion.c_str() ));
                 const gchar ** pAttrs = 0;
                 const gchar ** pProps = 0;
-                ctRevision.addRevision( toType<UT_uint32>(m_ctMostRecentWritingVersion),
+                ctRevision.addRevision( fromChangeID(ctMostRecentWritingVersion),
                                         PP_REVISION_ADDITION, pAttrs, pProps );
             }
             if( m_ctParagraphDeletedRevision != -1 )
             {
-                UT_DEBUGMSG(("ODTCT ctRevision.addRevision() del startpara rev:%d\n", m_ctParagraphDeletedRevision ));
+                UT_DEBUGMSG(("ODTCT ctRevision.addRevision() del startpara2 rev:%d\n", m_ctParagraphDeletedRevision ));
                 const gchar ** pAttrs = 0;
                 const gchar ** pProps = 0;
                 ctRevision.addRevision( m_ctParagraphDeletedRevision,
@@ -2553,7 +2650,7 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
                              m_mergeIDRef.c_str() ));
                 const gchar ** pAttrs = 0;
                 const gchar ** pProps = 0;
-                ctRevision.addRevision( toType<UT_uint32>(m_mergeIDRef),
+                ctRevision.addRevision( fromChangeID(m_mergeIDRef),
                                         PP_REVISION_DELETION, pAttrs, pProps );
                 
             }
@@ -2568,7 +2665,7 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             //     revString = m_ctRevisionIDBeforeMergeBlock.c_str();
             // }
             // else
-                if( !m_mergeIDRef.empty() )
+            if( !m_mergeIDRef.empty() )
             {
 //                revString = "1,-2";
                 revString = ctRevision.getXMLstring();
@@ -2665,10 +2762,15 @@ void ODi_TextContent_ListenerState::_endParagraphElement (
 	ODi_ListenerStateAction& rAction) 
 {
     --m_paragraphNestingLevel;
-                                            
+
+    UT_DEBUGMSG(("ODTCT ODi_TextContent_ListenerState::_endParagraphElement()\n"));
     const gchar* pStyleName;
     const ODi_Style_Style* pStyle;
 
+    m_ctParagraphDeletedRevision = -1;
+    if( !m_ctAddRemoveStack.empty() )
+        m_ctAddRemoveStack.pop_back();
+    
     _flush ();
     m_bAcceptingText = false;
     
@@ -2704,7 +2806,6 @@ void ODi_TextContent_ListenerState::_endParagraphElement (
         rAction.bringUpMostRecentlyPostponedElement("Frame", true);
     }
 
-    m_ctParagraphDeletedRevision = -1;
     if( m_ctHaveParagraphFmt )
     {
         m_ctHaveParagraphFmt = false;
@@ -2822,3 +2923,38 @@ void ODi_TextContent_ListenerState::_insertAnnotation() {
     m_pAbiDocument->appendStrux(PTX_SectionAnnotation, pPropsArray);
     m_bPendingAnnotation = false;
 }
+
+PP_RevisionAttr&
+ODi_TextContent_ListenerState::ctAddRemoveStackSetup( PP_RevisionAttr& ra, m_ctAddRemoveStack_t& stack )
+{
+    UT_DEBUGMSG(("ODi_TextContent_ListenerState::ctAddRemoveStackSetup() st.sz:%d\n", stack.size() ));
+    for( m_ctAddRemoveStack_t::iterator iter = stack.begin();
+         iter != stack.end(); ++iter )
+    {
+        UT_DEBUGMSG(("type:%d ver:%s\n", iter->first, iter->second.c_str() ));
+        if( !iter->second.empty() )
+        {
+            const gchar ** pAttrs = 0;
+            const gchar ** pProps = 0;
+            ra.addRevision( fromChangeID( iter->second ), iter->first, pAttrs, pProps );
+        }
+    }
+    return ra;
+}
+
+std::string
+ODi_TextContent_ListenerState::ctAddRemoveStackGetLast( PP_RevisionType t )
+{
+    std::string ret = "";
+    for( m_ctAddRemoveStack_t::reverse_iterator iter = m_ctAddRemoveStack.rbegin();
+         iter != m_ctAddRemoveStack.rend(); ++iter )
+    {
+        if( iter->first == t && !iter->second.empty() )
+        {
+            ret = iter->second;
+            break;
+        }
+    }
+    return ret;
+}
+

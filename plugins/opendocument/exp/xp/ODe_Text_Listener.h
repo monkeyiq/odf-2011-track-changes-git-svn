@@ -40,6 +40,7 @@ class ODe_AuxiliaryData;
 class ODe_ListenerAction;
 class ODe_Styles;
 class ODe_Style_List;
+class ODe_ChangeTrackingDeltaMerge;
 
 // AbiWord classes
 class PP_AttrProp;
@@ -174,7 +175,10 @@ private:
     int m_ctpParagraphAdditionalSpacesOffset;                //< adjust m_spacesOffset during close of text:p
     std::stringstream m_ctpTextSpanEnclosingElementCloseStream; //< output after </text:span> is written
     int m_ctpSpanAdditionalSpacesOffset;                        //< adjust m_spacesOffset during close of text:span
-
+    ODe_ChangeTrackingDeltaMerge* m_ctDeltaMerge;               //< if != 0 then we are inside a delta:merge element
+    bool m_ctDeltaMergeJustStarted;                             //< if we start a DM then close XML element tags are ommitted.
+    void ctDeltaMerge_cleanup();
+    
     /**
      * Gather all of the attrName attributes from the revisions of
      * pAP. The attrDefault if non zero is assumed to be the "normal"

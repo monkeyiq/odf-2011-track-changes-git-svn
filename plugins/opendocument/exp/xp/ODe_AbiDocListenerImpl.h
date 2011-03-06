@@ -100,6 +100,7 @@ public:
     virtual void insertInlinedImage(const gchar* /*pImageName*/,
                                     const PP_AttrProp* /*pAP*/) {}
 
+    
 
     virtual void setCurrentDocumentPosition( PT_DocPosition pos )
     {

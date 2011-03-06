@@ -32,7 +32,8 @@ ODe_AuxiliaryData::ODe_AuxiliaryData() :
     m_pTOCContents(NULL),
     m_tableCount(0),
     m_frameCount(0),
-    m_noteCount(0)
+    m_noteCount(0),
+    m_ChangeTrackingAreWeInsideTable(0)
 {
 }
 
@@ -102,6 +103,94 @@ void ODe_HeadingStyles::addStyleName( const gchar* pStyleName,
 /************************************************************/
 /************************************************************/
 
+bool
+ODe_ChangeTrackingDeltaMerge::isDifferentRevision( const PP_RevisionAttr& ra )
+{
+    bool ret = false;
+    for( int i = ra.getRevisionsCount()-1; i >= 0; --i )
+    {
+        const PP_Revision* r = ra.getNthRevision(i);
+        if( r->getType() == PP_REVISION_DELETION
+            || r->getType() == PP_REVISION_ADDITION )
+        {
+            if( r->getId() != m_revision )
+            {
+                ret = true;
+            }
+            break;
+        }
+    }
+    return ret;
+}
+
+ODe_ChangeTrackingDeltaMerge::state_t
+ODe_ChangeTrackingDeltaMerge::getState() const
+{
+    return m_state;
+}
+
+
+void
+ODe_ChangeTrackingDeltaMerge::setState( state_t s )
+{
+    state_t old = m_state;
+    UT_DEBUGMSG(("ODe_ChangeTrackingDeltaMerge::setState() old:%d new:%d\n", old, s ));
+    if( s <= old )
+        return;
+
+    if( old < DM_OPENED )
+        open();
+    
+    if( s >= DM_LEADING && old < DM_LEADING )
+    {
+        m_ss << "<delta:leading-partial-content>"; // << std::endl;
+    }
+    if( s >= DM_INTER && old < DM_INTER )
+    {
+        m_ss << "</delta:leading-partial-content>"; // << std::endl;
+        m_ss << "<delta:intermediate-content>" << std::endl;
+    }
+    if( s >= DM_TRAILING && old < DM_TRAILING )
+    {
+        m_ss << "</delta:intermediate-content>" << std::endl;
+        m_ss << "<delta:trailing-partial-content>" << std::endl;
+    }
+    if( s >= DM_END && old < DM_END )
+    {
+        m_ss << "</delta:trailing-partial-content>";
+    }
+
+    m_state = s;
+}
+
+std::string
+ODe_ChangeTrackingDeltaMerge::flushBuffer()
+{
+    std::string ret = m_ss.str();
+    m_ss.rdbuf()->str("");
+    return ret;
+}
+
+void
+ODe_ChangeTrackingDeltaMerge::open()
+{
+    std::string idref = m_rAuxiliaryData.toChangeID( m_revision );
+    m_ss << "<delta:merge delta:removal-change-idref=\"" << idref << "\">" << std::endl;
+    m_state = DM_OPENED;
+}
+
+void
+ODe_ChangeTrackingDeltaMerge::close()
+{
+    setState( DM_END );
+    m_ss << "</delta:merge>";
+}
+
+
+/************************************************************/
+/************************************************************/
+/************************************************************/
+
 void
 ODe_ChangeTrackingParagraph_Data::updatePara( const PP_RevisionAttr* ra )
 {
@@ -114,11 +203,13 @@ ODe_ChangeTrackingParagraph_Data::updatePara( const PP_RevisionAttr* ra )
     m_minDeletedRevision = 0;
     m_allSpansAreSameVersion = true;
     m_lastSpanVersion = -1;
+
+    m_seeingFirstSpanTag = true;
 }
 
 
 void
-ODe_ChangeTrackingParagraph_Data::update( const PP_RevisionAttr* ra )
+ODe_ChangeTrackingParagraph_Data::update( const PP_RevisionAttr* ra, PT_DocPosition pos )
 {
     if( !ra->getRevisionsCount() )
         return;
@@ -187,13 +278,39 @@ ODe_ChangeTrackingParagraph_Data::update( const PP_RevisionAttr* ra )
         m_minDeletedRevision = std::min( m_minDeletedRevision, last->getId() );
         
     }
+
+    m_lastSpanPosition = pos;
+    m_lastSpanRevision = 0;
+    m_lastSpanRevisionType = PP_REVISION_NONE;
+    for( int i = ra->getRevisionsCount()-1; i >= 0; --i )
+    {
+        const PP_Revision* r = ra->getNthRevision(i);
+        if( r->getType() == PP_REVISION_DELETION
+            || r->getType() == PP_REVISION_ADDITION )
+        {
+            m_lastSpanRevision     = r->getId();
+            m_lastSpanRevisionType = r->getType();
+            break;
+        }
+    }
+
+    if( m_seeingFirstSpanTag )
+    {
+        m_seeingFirstSpanTag = false;
+        //
+        // the m_lastSpanRevision is what we just saw.
+        // it will get updated each <c> element, it is currently
+        // the value of the first <c> element which is what we want.
+        m_firstSpanRevision     = m_lastSpanRevision;
+        m_firstSpanRevisionType = m_lastSpanRevisionType;
+    }
     
 }
 
 bool
 ODe_ChangeTrackingParagraph_Data::isParagraphStartDeleted()
 {
-    UT_DEBUGMSG(("isParagraphStartDeleted: id:%s maxR:%d maxDelR:%d minDelRev:%d all-spans-same-rev:%d\n",
+    UT_DEBUGMSG(("isParagraphStartDeleted: id:%s maxR:%d maxDelR:%d minDelR:%d all-spans-same-rev:%d\n",
                  m_splitID.c_str(),
                  m_maxRevision,
                  m_maxDeletedRevision, m_minDeletedRevision,
@@ -203,16 +320,44 @@ ODe_ChangeTrackingParagraph_Data::isParagraphStartDeleted()
                  m_maxParaRevision,
                  m_maxParaDeletedRevision ));
 
+    UT_DEBUGMSG(("isParagraphStartDeleted() fsrt:%d fsrev:%d maxpdr:%d\n",
+                 m_firstSpanRevisionType,
+                 m_firstSpanRevision,
+                 m_maxParaDeletedRevision ));
+    
     bool ret = false;
+
+    if( m_firstSpanRevisionType == PP_REVISION_DELETION )
+    {
+        if( m_firstSpanRevision == m_maxParaDeletedRevision )
+        {
+            UT_DEBUGMSG(("isParagraphStartDeleted yes case 1\n" ));
+            ret = true;
+        }
+    }
+    
     if( m_maxParaDeletedRevision )
     {
         if( m_minDeletedRevision < m_maxParaDeletedRevision )
         {
+            UT_DEBUGMSG(("isParagraphStartDeleted yes case 2\n" ));
             ret = true;
         }
     }
     return ret;
 }
+
+bool
+ODe_ChangeTrackingParagraph_Data::isParagraphEndDeleted()
+{
+    if( m_lastSpanRevisionType == PP_REVISION_DELETION )
+    {
+        return true;
+    }
+    
+    return false;
+}
+
 
 
 bool
@@ -220,6 +365,16 @@ ODe_ChangeTrackingParagraph_Data::isParagraphDeleted()
 {
     UT_DEBUGMSG(("isParagraphDeleted: m_maxRevision:%d m_maxDeletedRevision:%d all-spans-same-rev:%d\n",
                  m_maxRevision, m_maxDeletedRevision, m_allSpansAreSameVersion ));
+
+    // table cells might have <c></c> elements with no revision numbers in them
+    if( m_maxParaDeletedRevision > 0 )
+    {
+        if( m_allSpansAreSameVersion && !m_maxRevision )
+        {
+            return true;
+        }
+    }
+
     return m_maxRevision
         && m_maxRevision == m_maxDeletedRevision
         && m_allSpansAreSameVersion;
@@ -228,6 +383,15 @@ ODe_ChangeTrackingParagraph_Data::isParagraphDeleted()
 UT_uint32
 ODe_ChangeTrackingParagraph_Data::getVersionWhichRemovesParagraph()
 {
+    // table cells might have <c></c> elements with no revision numbers in them
+    if( m_maxParaDeletedRevision > 0 )
+    {
+        if( m_allSpansAreSameVersion && !m_maxRevision )
+        {
+            return m_maxParaDeletedRevision;
+        }
+    }
+    
     return m_maxRevision;
 }
 
@@ -249,15 +413,16 @@ ODe_ChangeTrackingParagraph_Data::getVersionWhichIntroducesParagraph()
 
 
 pChangeTrackingParagraphData_t
-ODe_AuxiliaryData::getChangeTrackingParagraphData( PT_DocPosition pos )
+ODe_AuxiliaryData::getChangeTrackingParagraphDataContaining( PT_DocPosition pos )
 {
-    UT_DEBUGMSG(("getChangeTrackingParagraphData sz:%d pos:%d\n",
-                 m_ChangeTrackingParagraphs.size(), pos ));
     m_ChangeTrackingParagraphs_t::iterator iter = m_ChangeTrackingParagraphs.begin();
     m_ChangeTrackingParagraphs_t::iterator e    = m_ChangeTrackingParagraphs.end();
     for( ; iter != e; ++iter )
     {
         pChangeTrackingParagraphData_t ct = *iter;
+
+        UT_DEBUGMSG(("getChangeTrackingParagraphData ct pos:%d beg:%d end:%d\n",
+                     pos, ct->getBeginPosition(), ct->getEndPosition() ));
         
         if( ct->contains( pos ))
             return ct;
@@ -266,9 +431,36 @@ ODe_AuxiliaryData::getChangeTrackingParagraphData( PT_DocPosition pos )
 }
 
 pChangeTrackingParagraphData_t
+ODe_AuxiliaryData::getChangeTrackingParagraphData( PT_DocPosition pos )
+{
+    UT_DEBUGMSG(("getChangeTrackingParagraphData sz:%d pos:%d\n",
+                 m_ChangeTrackingParagraphs.size(), pos ));
+
+    pChangeTrackingParagraphData_t ct = getChangeTrackingParagraphDataContaining( pos );
+    if( ct )
+        return ct;
+    
+    if( !m_ChangeTrackingParagraphs.empty() )
+    {
+        pChangeTrackingParagraphData_t ct = m_ChangeTrackingParagraphs.back();
+        if( ct->getEndPosition() == pos )
+        {
+            return ct;
+        }
+    }
+    
+    return 0;
+}
+
+pChangeTrackingParagraphData_t
 ODe_AuxiliaryData::ensureChangeTrackingParagraphData( PT_DocPosition pos )
 {
-    pChangeTrackingParagraphData_t ret = getChangeTrackingParagraphData( pos );
+    //
+    // When building the collection use containing to avoid returning the last
+    // CTPD element which will always end at the pos of the start of a subsequent
+    // paragraph.
+    //
+    pChangeTrackingParagraphData_t ret = getChangeTrackingParagraphDataContaining( pos );
     if( ret )
         return ret;
 

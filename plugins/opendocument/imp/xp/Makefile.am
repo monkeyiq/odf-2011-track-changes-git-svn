@@ -23,6 +23,7 @@ libxp_la_SOURCES = \
 	ODi_ListenerStateAction.cpp \
 	ODi_ListenerStateAction.h \
 	ODi_ListenerState.h \
+	ODi_ListenerState.cpp \
 	ODi_ListLevelStyle.cpp \
 	ODi_ListLevelStyleFormats.h \
 	ODi_ListLevelStyle.h \

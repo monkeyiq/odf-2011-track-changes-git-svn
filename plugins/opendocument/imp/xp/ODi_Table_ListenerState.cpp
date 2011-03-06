@@ -29,10 +29,60 @@
 #include "ODi_Office_Styles.h"
 #include "ODi_Style_Style.h"
 #include "ODi_ListenerStateAction.h"
+#include "ODi_StartTag.h"
 
 // AbiWord includes
 #include <pd_Document.h>
 
+#include <ut_conversion.h>
+
+
+// FIXME: duplicate...
+#include <boost/array.hpp>
+template< std::size_t N = 32 >
+class propertyArray
+{
+public:
+    typedef const gchar* T;
+    typedef boost::array< const gchar*, N > m_boostArray_t;
+    typedef typename m_boostArray_t::value_type value_type;
+    typedef typename m_boostArray_t::iterator   iterator;
+    typedef typename m_boostArray_t::const_iterator   const_iterator;
+    typedef typename m_boostArray_t::reference reference;
+    typedef typename m_boostArray_t::const_reference const_reference;
+    typedef std::size_t    size_type;
+
+    propertyArray()
+        :
+        m_highestUsedIndex( 0 )
+    {
+        m_array.assign( 0 );
+    }
+    
+    void push_back( const gchar* v )
+    {
+        std::size_t sz = count();
+        m_array.at(sz) = v;
+        m_highestUsedIndex++;
+    }
+
+    std::size_t count() const
+    {
+        return m_highestUsedIndex;
+    }
+
+    const_reference operator[](size_type i) const 
+    {
+        return m_array.at(i);
+    }
+    static size_type size() { return N; }
+    T* data() { return m_array.data(); }
+
+    
+private:
+    std::size_t     m_highestUsedIndex;
+    m_boostArray_t  m_array;
+};
 
 /**
  * Constructor
@@ -147,82 +197,138 @@ void ODi_Table_ListenerState::endElement (const gchar* pName,
 /**
  * Used to parse a <table:table> start element.
  */
-void ODi_Table_ListenerState::_parseTableStart(const gchar** ppAtts,
-                                              ODi_ListenerStateAction& rAction) {
+void
+ODi_Table_ListenerState::_parseTableStart( const gchar** ppAtts,
+                                           ODi_ListenerStateAction& rAction )
+{
                                                 
-    if (m_elementLevel == 0) {
-        if (m_onFirstPass) {
+    if (m_elementLevel == 0)
+    {
+        if (m_onFirstPass)
+        {
             rAction.repeatElement();
-        } else {
-            const gchar* ppAttribs[10];
+        }
+        else
+        {
+            propertyArray<> ppStruxAtts;
             UT_UTF8String props;
             const gchar* pVal;
             const ODi_Style_Style* pStyle = NULL;
+
+            PP_RevisionAttr ctRevision;
+            std::string idref = UT_getAttribute("delta:insertion-change-idref", ppAtts, "" );
+            if( !idref.empty() )
+            {
+                UT_DEBUGMSG(("ODi_Table_ListenerState::_parseTableStart() idref:%s\n", idref.c_str() ));
+                const gchar ** pAttrs = 0;
+                const gchar ** pProps = 0;
+                ctRevision.addRevision( fromChangeID(idref),
+                                        PP_REVISION_ADDITION, pAttrs, pProps );
+                
+                //
+                // If we are in a delta:merge element or other implicit delete scope.
+                //
+                updateToHandleRemovalVersion( ctRevision );
+
+                // if( UT_uint32 v = getImplicitRemovalVersion() )
+                // {
+                //     UT_DEBUGMSG(("ODi_Table_ListenerState::_parseTableStart() implicit del revision:%d\n",v));
+                //     ctRevision.addRevision( v, PP_REVISION_DELETION, pAttrs, pProps );
+                // }
+                // else if( const ODi_StartTag* st = m_rElementStack.getClosestElement( "delta:removed-content" ))
+                // {
+                //     if( const char* v = st->getAttributeValue( "delta:removal-change-idref" ))
+                //     {
+                //         ctRevision.addRevision( fromChangeID(v),
+                //                                 PP_REVISION_DELETION, pAttrs, pProps );
+                //     }
+                // }
+                
+                if( ctRevision.getXMLstring()
+                    && strcmp("0", ctRevision.getXMLstring()))
+                {
+                    ppStruxAtts.push_back( PT_REVISION_ATTRIBUTE_NAME );
+                    ppStruxAtts.push_back( ctRevision.getXMLstring() );
+//                  ppStruxAtts.push_back( idref.c_str() );
+                }
+                
+                
+            }
             
             pVal = UT_getAttribute("table:style-name", ppAtts);
-            if (pVal) {
+            if (pVal)
+            {
                 pStyle = m_pStyles->getTableStyle(pVal, m_onContentStream);
                 UT_ASSERT(pStyle);
             }
             
             // Background color
-            if (pStyle != NULL) {
+            if (pStyle != NULL)
+            {
                 if (!pStyle->getBackgroundColor()->empty()) {
                     props += "background-color:";
                     props += pStyle->getBackgroundColor()->utf8_str();
                 }
             }
             // Left table pos
-            if (pStyle != NULL) {
-                if (!pStyle->getTableMarginLeft()->empty()) {
-		    if (!props.empty()) {
-		        props += "; ";
-		    }
-		    props += "table-column-leftpos:";
-		    props += pStyle->getTableMarginLeft()->utf8_str();
-		    
+            if (pStyle != NULL)
+            {
+                if (!pStyle->getTableMarginLeft()->empty())
+                {
+                    if (!props.empty())
+                    {
+                        props += "; ";
+                    }
+                    props += "table-column-leftpos:";
+                    props += pStyle->getTableMarginLeft()->utf8_str();
                 }
             }
 
             // table width
-            if (pStyle != NULL) {
-                if (!pStyle->getTableWidth()->empty()) {
-		    if (!props.empty()) {
-		        props += "; ";
-		    }
-		    props += "table-width:";
-		    props += pStyle->getTableWidth()->utf8_str();
-		    
+            if (pStyle != NULL)
+            {
+                if (!pStyle->getTableWidth()->empty())
+                {
+                    if (!props.empty())
+                    {
+                        props += "; ";
+                    }
+                    props += "table-width:";
+                    props += pStyle->getTableWidth()->utf8_str();
                 }
             }
 
 
             // table relative width 
-            if (pStyle != NULL) {
-                if (!pStyle->getTableRelWidth()->empty()) {
-		    if (!props.empty()) {
-		        props += "; ";
-		    }
-		    props += "table-rel-width:";
-		    props += pStyle->getTableRelWidth()->utf8_str();
-		    
+            if (pStyle != NULL)
+            {
+                if (!pStyle->getTableRelWidth()->empty())
+                {
+                    if (!props.empty())
+                    {
+                        props += "; ";
+                    }
+                    props += "table-rel-width:";
+                    props += pStyle->getTableRelWidth()->utf8_str();
                 }
             }
   
             // Column widths
-            if (m_gotAllColumnWidths) {
-                if (!props.empty()) {
+            if (m_gotAllColumnWidths)
+            {
+                if (!props.empty())
+                {
                     props += "; ";
                 }
                 props += "table-column-props:";
                 props += m_columnWidths;
             }
- 
+            
            // Column Rel widths
             if (m_gotAllColumnWidths && !m_columnRelWidths.empty()) 
-	    {
+            {
                 if (!props.empty()) 
-		{
+                {
                     props += "; ";
                 }
                 props += "table-rel-column-props:";
@@ -230,7 +336,8 @@ void ODi_Table_ListenerState::_parseTableStart(const gchar** ppAtts,
             }
             
             // Row heights
-            if (!props.empty()) {
+            if (!props.empty())
+            {
                 props += "; ";
             }
             props += "table-row-heights:";
@@ -238,13 +345,19 @@ void ODi_Table_ListenerState::_parseTableStart(const gchar** ppAtts,
             
 	    
             
-            if (!props.empty()) {
-                ppAttribs[0] = "props";
-                ppAttribs[1] = props.utf8_str();
-                ppAttribs[2] = 0; // Signal the end of the array.
-                
-                m_pAbiDocument->appendStrux(PTX_SectionTable, ppAttribs);
-            } else {
+            if (!props.empty())
+            {
+                ppStruxAtts.push_back("props");
+                ppStruxAtts.push_back(props.utf8_str());
+            }
+
+            UT_DEBUGMSG(("ODi_Table_ListenerState::_parseTableStart() count:%d\n",ppStruxAtts.count()));
+            if( ppStruxAtts.count() )
+            {
+                m_pAbiDocument->appendStrux(PTX_SectionTable, ppStruxAtts.data() );
+            }
+            else
+            {
                 m_pAbiDocument->appendStrux(PTX_SectionTable, NULL);
             }
             
@@ -253,7 +366,9 @@ void ODi_Table_ListenerState::_parseTableStart(const gchar** ppAtts,
             m_row = 0;
             m_col = 0;
         }
-    } else {
+    }
+    else
+    {
         // It's a nested table
         if (m_onFirstPass) {
             m_waitingEndElement = "table:table";
@@ -555,6 +670,26 @@ void ODi_Table_ListenerState::_parseCellStart (const gchar** ppAtts,
 
         int idx = 0;
         const gchar *cell_props[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+        //
+        // implicit deletion scope from delta:merge etc.
+        //
+        PP_RevisionAttr ctRevision;
+        {
+            const gchar ** pAttrs = 0;
+            const gchar ** pProps = 0;
+//            ctRevision.addRevision( fromChangeID(idref),
+//                                    PP_REVISION_ADDITION, pAttrs, pProps );
+            updateToHandleRemovalVersion( ctRevision );
+            UT_DEBUGMSG(("ODi_Table_ListenerState::_parseCellStart() rev:%s\n", ctRevision.getXMLstring() ));
+            if( ctRevision.getXMLstring()
+                && strcmp("0", ctRevision.getXMLstring()))
+            {
+                cell_props[idx++] = PT_REVISION_ATTRIBUTE_NAME;
+                cell_props[idx++] = ctRevision.getXMLstring();
+            }
+        }
+        
         if( xmlid )
         {
             cell_props[idx++] = PT_XMLID;

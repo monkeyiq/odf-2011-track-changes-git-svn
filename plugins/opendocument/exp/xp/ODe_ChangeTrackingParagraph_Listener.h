@@ -44,11 +44,16 @@ public:
     void closeSpan();
     virtual void insertText(const UT_UTF8String& rText);
 
+    virtual void openTable(const PP_AttrProp* pAP, ODe_ListenerAction& rAction);
+    virtual void closeTable(ODe_ListenerAction& rAction);
+    virtual void openSection( const PP_AttrProp* pAP, ODe_ListenerAction& rAction );
+    
 
 private:
     ODe_Styles& m_rStyles;
     ODe_AuxiliaryData& m_rAuxiliaryData;
     pChangeTrackingParagraphData_t m_current;
+    bool m_foundIntermediateContent;
 };
 
 #endif /*ODE_CHANGETRACKINGPARAGRAPH_LISTENER_H_*/

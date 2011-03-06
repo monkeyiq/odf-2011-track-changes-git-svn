@@ -28,11 +28,13 @@
 #include <gsf/gsf-output-memory.h>
 
 #include "pt_Types.h"
+#include "pp_Revision.h"
 #include <map>
 #include <list>
+#include <sstream>
 class PP_AttrProp;
 class PP_RevisionAttr;
-
+class ODe_AuxiliaryData;
 
 /**
  * All paragraph styles used to define the chapter levels of a document are
@@ -65,6 +67,71 @@ public:
 private:
     UT_GenericVector<UT_UTF8String*> m_styleNames;
     UT_GenericVector<UT_uint8> m_outlineLevels;
+};
+
+/**
+ * Help writing out a delta:merge block. Keep track of which element
+ * in leading-partial-content, intermediate-content, and
+ * trailing-partial-content we are currently in and open/close those
+ * as the STATE is set. Because the delta:merge element should remain
+ * open across multiple ODF XML elements the revision that opened the
+ * delta:merge is also tracked so that code can properly detect when
+ * the merge block should end.
+ */
+class ODe_ChangeTrackingDeltaMerge
+{
+  public:
+    typedef enum 
+    {
+        DM_NONE = 0,
+        DM_OPENED = 1,
+        DM_LEADING = 2,
+        DM_INTER = 3,
+        DM_TRAILING = 4,
+        DM_END = 5
+    } state_t;
+    state_t   m_state;
+    UT_uint32 m_revision;
+    std::stringstream m_ss;
+    ODe_AuxiliaryData& m_rAuxiliaryData;
+    
+  ODe_ChangeTrackingDeltaMerge( ODe_AuxiliaryData& aux, UT_uint32 r )
+      : m_rAuxiliaryData( aux )
+        , m_state( DM_NONE )
+        , m_revision( r )
+    {
+    }
+
+    /**
+     * If 'r' is a different revision return true. This means that
+     * 'r' should not be treated as part of this delta:merge block
+     * and the merge should be ended before the data for 'r' is written.
+     */
+    bool isDifferentRevision( const PP_RevisionAttr& r );
+
+    /**
+     * Change to the given state, writing out XML as needed.
+     */
+    void setState( state_t s );
+
+    state_t getState() const;
+    
+    /**
+     * Grab the XML that should be output so far and flush that buffer
+     * clean
+     */
+    std::string flushBuffer();
+
+    /**
+     * Open the delta:merge XML element with the change-id from the revision given
+     * in the ctor
+     */
+    void open();
+    
+    /**
+     * Close the delta:merge XML element
+     */
+    void close();
 };
 
 
@@ -100,13 +167,21 @@ class ODe_ChangeTrackingParagraph_Data
     UT_uint32 m_lastSpanVersion;
     
   public:
-    UT_uint32 m_minRevision;  //< lowest revision appearing in any <c> tag
-    UT_uint32 m_maxRevision;  //< highest revision appearing in any <c> tag
+    UT_uint32 m_minRevision;            //< lowest revision appearing in any <c> tag
+    UT_uint32 m_maxRevision;            //< highest revision appearing in any <c> tag
     UT_uint32 m_maxDeletedRevision;     //< lowest  -revision appearing in any <c> tag
     UT_uint32 m_minDeletedRevision;     //< highest -revision appearing in any <c> tag
     bool      m_allSpansAreSameVersion; //< all <c> tags are the same revision
     UT_uint32 m_maxParaRevision;        //< highest revision appearing in <p> tag
     UT_uint32 m_maxParaDeletedRevision; //< highest negative version number for para
+    UT_uint32 m_lastSpanRevision;       //< revision of last change to last <c> or <p>
+    PP_RevisionType m_lastSpanRevisionType; //< ADD/PP_REVISION_DELETION
+    bool m_seeingFirstSpanTag; //< PARSING: Keeping track if this is the first <c> element seen
+    UT_uint32 m_firstSpanRevision;          //< revision of last change to first <c> or <p>
+    PP_RevisionType m_firstSpanRevisionType; //< ADD/PP_REVISION_DELETION
+    PT_DocPosition m_lastSpanPosition; //< offset of last <c> cpan
+    bool m_foundIntermediateContent;   //< true if there is this paragraph is not right after the last one
+        
     std::string m_splitID;
     ODe_ChangeTrackingParagraph_Data()
         : m_minRevision(-1)
@@ -117,12 +192,16 @@ class ODe_ChangeTrackingParagraph_Data
         , m_lastSpanVersion(-1)
         , m_maxParaRevision(0)
         , m_maxParaDeletedRevision(0)
+        , m_seeingFirstSpanTag(false) // init in updatePara()
+        , m_lastSpanPosition(0)
+        , m_foundIntermediateContent( false )
     {
     }
-    void update( const PP_RevisionAttr* ra );
+    void update( const PP_RevisionAttr* ra, PT_DocPosition pos );
     void updatePara( const PP_RevisionAttr* ra );
     bool isParagraphDeleted();
     bool isParagraphStartDeleted();
+    bool isParagraphEndDeleted();
     UT_uint32 getVersionWhichRemovesParagraph();
     UT_uint32 getVersionWhichIntroducesParagraph();
     void setSplitID( const std::string& s ) 
@@ -227,8 +306,9 @@ typedef ODe_ChangeTrackingScopedData< ODe_ChangeTrackingParagraph_Data >* pChang
 /**
  * Auxiliary data used and shared by all listener implementations.
  */
-class ODe_AuxiliaryData {
-public:
+class ODe_AuxiliaryData
+{
+  public:
     ODe_AuxiliaryData();
     ~ODe_AuxiliaryData();
 
@@ -271,8 +351,11 @@ public:
     // methods call here to canonize the change-id numbers for use in XML
     std::string toChangeID( const std::string& s );
     std::string toChangeID( UT_uint32 v );
-    
-    
+    long m_ChangeTrackingAreWeInsideTable;
+
+  private:
+    pChangeTrackingParagraphData_t getChangeTrackingParagraphDataContaining( PT_DocPosition pos );
+
 };
 
 #endif /*ODE_AUXILIARYDATA_H_*/

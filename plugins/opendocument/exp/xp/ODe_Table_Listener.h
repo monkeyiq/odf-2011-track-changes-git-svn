@@ -156,6 +156,10 @@ private:
     ODe_Style_Style m_tableWideCellStyle;
     UT_GenericVector<UT_UTF8String*> columnStyleNames;
     UT_GenericVector<UT_UTF8String*> rowStyleNames;
+
+    // Change Tracking
+    std::string m_ctTableIntroducingVersionID;
+    std::string m_ctTableDeletingVersionID;
 };
 
 #endif /*ODE_TABLE_LISTENER_H_*/

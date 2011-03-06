@@ -3,6 +3,7 @@
  * Copyright (C) 2005 INdT
  * Author: Daniel d'Andrada T. de Carvalho <daniel.carvalho@indt.org.br>
  * Copyright 2009 AbiSource Corporation B.V.
+ * Author: Ben Martin 2010-2011 Copyright of that work 2010 AbiSource Corporation B.V.
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -30,6 +31,7 @@
 #include "ODe_AutomaticStyles.h"
 #include "ODe_Style_Style.h"
 #include "ODe_Text_Listener.h"
+#include "pp_Revision.h"
 
 // AbiWord includes
 #include <pp_AttrProp.h>
@@ -72,6 +74,21 @@ ODe_Table_Listener::~ODe_Table_Listener() {
 }
 
 
+// FIXME
+static const char* UT_getAttribute( const PP_AttrProp* pAP, const char* name, const char* def = 0 )
+{
+    const gchar* pValue;
+    bool ok;
+    
+    ok = pAP->getAttribute( name, pValue );
+    if (!ok)
+    {
+        pValue = def;
+    }
+    return pValue;
+}
+
+
 /**
  * 
  */
@@ -87,6 +104,43 @@ void ODe_Table_Listener::openTable(const PP_AttrProp* pAP,
     m_rAuxiliaryData.m_tableCount++;
     UT_UTF8String_sprintf(m_tableName, "Table%u", m_rAuxiliaryData.m_tableCount);
 
+    UT_DEBUGMSG(("ODe_Table_Listener::openTable() have dpos:%d ctp:%d\n",
+                 getCurrentDocumentPosition(),
+                 m_rAuxiliaryData.getChangeTrackingParagraphData( getCurrentDocumentPosition() )
+                    ));
+    
+    m_ctTableIntroducingVersionID = "";
+    m_ctTableDeletingVersionID = "";
+    if( const char* revisionString = UT_getAttribute( pAP, "revision", 0 ))
+    {
+        UT_DEBUGMSG(("ODe_Table_Listener::openTable() rev:%s\n", revisionString ));
+        PP_RevisionAttr ra( revisionString );
+        if( ra.getRevisionsCount() )
+        {
+            const PP_Revision* r = 0;
+            for( int raIdx = 0;
+                 raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
+                 raIdx++ )
+            {
+                std::string idref = m_rAuxiliaryData.toChangeID( r->getId() );
+                UT_DEBUGMSG(("ODe_Table_Listener::openTable() type:%d idref:%s\n",
+                             r->getType(), idref.c_str() ));
+                
+                if( r->getType() == PP_REVISION_ADDITION )
+                {
+                    if( m_ctTableIntroducingVersionID.empty() )
+                        m_ctTableIntroducingVersionID = idref;
+                }
+                if( r->getType() == PP_REVISION_DELETION )
+                {
+                    m_ctTableDeletingVersionID = idref;
+                }
+            }
+        }
+        
+    }
+    
+    
     if (ODe_Style_Style::hasTableStyleProps(pAP)) {
         m_tableStyleName = m_tableName; // Plain simple
         
@@ -212,17 +266,49 @@ void ODe_Table_Listener::openTable(const PP_AttrProp* pAP,
 /**
  * 
  */
-void ODe_Table_Listener::closeTable(ODe_ListenerAction& rAction) {
+void
+ODe_Table_Listener::closeTable(ODe_ListenerAction& rAction)
+{
     UT_sint32 i;
     UT_UTF8String output;
     
     _buildTable();
+
+    /*
+     * Change Tracking
+     */
+    if( !m_ctTableDeletingVersionID.empty() )
+    {
+        output += "<delta:removed-content ";
+//        output += " RR=\"table\" ";
+        output += " delta:removal-change-idref=\"";
+        output += m_ctTableDeletingVersionID;
+        output += "\">\n";
+    }
     
     _printSpacesOffset(output);
     output += "<table:table table:name=\"";
     output += m_tableName;
     output += "\"";
 
+    UT_DEBUGMSG(("ODe_Table_Listener::closeTable() have dpos:%d ctp:%d\n",
+                 getCurrentDocumentPosition(),
+                 m_rAuxiliaryData.getChangeTrackingParagraphData( getCurrentDocumentPosition() )
+                    ));
+    /*
+     * Change Tracking
+     */
+    if( !m_ctTableIntroducingVersionID.empty() )
+    {
+        std::string insType = "insert-with-content";
+        output += " delta:insertion-type=\"";
+        output += insType;
+        output += "\"";
+        output += " delta:insertion-change-idref=\"";
+        output += m_ctTableIntroducingVersionID;
+        output += "\"";
+    }
+    
     ODe_writeAttribute(output, "table:style-name", m_tableStyleName);
     output += ">\n";
     
@@ -246,8 +332,13 @@ void ODe_Table_Listener::closeTable(ODe_ListenerAction& rAction) {
     m_spacesOffset--;
     _printSpacesOffset(output);
     output += "</table:table>\n";
+    if( !m_ctTableDeletingVersionID.empty() )
+    {
+        output += "</delta:removed-content>\n";
+    }
     ODe_writeUTF8String(m_pTextOutput, output);
 
+    m_rAuxiliaryData.m_ChangeTrackingAreWeInsideTable--;
     rAction.popListenerImpl();
 }
 
@@ -268,6 +359,11 @@ void ODe_Table_Listener::openCell(const PP_AttrProp* pAP,
                                       
     pCell->loadAbiProps(pAP);
 
+    UT_DEBUGMSG(("ODe_Table_Listener::openCell() have dpos:%d ctp:%d\n",
+                 getCurrentDocumentPosition(),
+                 m_rAuxiliaryData.getChangeTrackingParagraphData( getCurrentDocumentPosition() )
+                    ));
+    
     ////    
     // Try to figure out the table dimensions.
     
