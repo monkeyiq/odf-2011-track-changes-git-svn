@@ -44,6 +44,7 @@ class ODe_ChangeTrackingDeltaMerge;
 
 // AbiWord classes
 class PP_AttrProp;
+class PP_Revision;
 
 
 /**
@@ -193,8 +194,15 @@ private:
     void _openODParagraphToBuffer( const PP_AttrProp* pAP,
                                    UT_UTF8String& output,
                                    const std::string& additionalElementAttributes = "",
-                                   bool closeElementWithSlashGreaterThan = false );
+                                   bool closeElementWithSlashGreaterThan = false,
+                                   std::list< const PP_Revision* > rl = std::list< const PP_Revision* >(),
+                                   UT_uint32 ctHighestRemoveLeavingContentStartRevision = 0 );
     stringlist_t m_genericBlockClosePostambleList;
+
+    // return true of the paragraph fpr pAP is a heading
+    bool isHeading( const PP_AttrProp* pAP ) const;
+    bool headingStateChanges( const PP_AttrProp* pAPa, const PP_AttrProp* pAPb ) const;
+    
     
 };
 

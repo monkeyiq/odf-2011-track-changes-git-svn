@@ -350,6 +350,36 @@ ODe_Text_Listener::ctDeltaMerge_cleanup()
 }
 
 
+bool textChangedAfterRevision( PP_RevisionAttr& ra, UT_uint32 rev )
+{
+    const PP_Revision* r = 0;
+    for( int raIdx = ra.getRevisionsCount()-1;
+         raIdx >= 0 && (r = ra.getNthRevision( raIdx ));
+         --raIdx )
+    {
+        if( r->getId() <= rev )
+            continue;
+
+        if( r->getType() == PP_REVISION_DELETION || r->getType() == PP_REVISION_ADDITION )
+            return true;
+    }
+    return false;
+}
+
+
+UT_uint32 getHighestRevisionNumberWithStyle( PP_RevisionAttr& ra )
+{
+    const PP_Revision* r = 0;
+
+    for( int raIdx = 0;
+         raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
+         raIdx++ )
+    {
+        if ( ODe_Style_Style::hasTextStyleProps(r) )
+            return r->getId();
+    }
+    return 0;
+}
 
 
 /**
@@ -361,7 +391,7 @@ ODe_Text_Listener::openSpan(const PP_AttrProp* pAP)
     UT_UTF8String styleName;
     bool ok;
     const gchar* pValue;
-
+    UT_uint32 styleRev = 0;
 
     UT_DEBUGMSG(("ODe_Text_Listener::openSpan()\n"));
 
@@ -388,6 +418,7 @@ ODe_Text_Listener::openSpan(const PP_AttrProp* pAP)
             UT_DEBUGMSG(("Text_Listener::openSpan() revision-raw:%s\n", pValue ));
             PP_RevisionAttr ra( pValue );
             bool forceVersionShell = false;
+            styleRev = getHighestRevisionNumberWithStyle( ra );
             
             if( m_ctDeltaMerge && m_ctDeltaMerge->isDifferentRevision( ra ) )
             {
@@ -472,11 +503,12 @@ ODe_Text_Listener::openSpan(const PP_AttrProp* pAP)
                     }
                 }
                 else if( forceVersionShell
-                         || last->getId() > ctp->getData().getVersionWhichIntroducesParagraph() )
+//                         || last->getId() > ctp->getData().getVersionWhichIntroducesParagraph() )
+                    || textChangedAfterRevision( ra, ctp->getData().getVersionWhichIntroducesParagraph() ))
                 {
                     std::string itid  = m_ctIdFactory.createId();
                     std::stringstream ss;
-                    ss << "<delta:inserted-text-start " //  from=\"shell\" "
+                    ss << "<delta:inserted-text-start   " // from=\"shell\" "
                        <<" delta:inserted-text-id="
                        << "\"" << itid << "\""
                        << " delta:insertion-change-idref="
@@ -493,6 +525,8 @@ ODe_Text_Listener::openSpan(const PP_AttrProp* pAP)
         }
     }
      
+    UT_DEBUGMSG(("ODe_Text_Listener::openSpan() has rev:%d\n", pAP->getAttribute("revision", pValue) ));
+    UT_DEBUGMSG(("ODe_Text_Listener::openSpan() has style-props:%d\n", ODe_Style_Style::hasTextStyleProps(pAP) ));
     
     if ( ODe_Style_Style::hasTextStyleProps(pAP) )
     {
@@ -512,19 +546,30 @@ ODe_Text_Listener::openSpan(const PP_AttrProp* pAP)
     else
     {
         ok = pAP->getAttribute("style", pValue);
+        UT_DEBUGMSG(("ODe_Text_Listener::openSpan() no style-props, ok:%d\n", ok ));
         if (ok)
         {
             styleName = pValue;
         }
     }
+
+    UT_DEBUGMSG(("ODe_Text_Listener::openSpan() styleName:%s\n", styleName.utf8_str() ));
+
     
     if (!styleName.empty())
     {
         UT_UTF8String output;
         
-        UT_UTF8String_sprintf(output, "<text:span text:style-name=\"%s\">",
+        UT_UTF8String_sprintf(output, "<text:span text:style-name=\"%s\"",
                               ODe_Style_Style::convertStyleToNCName(styleName).escapeXML().utf8_str());
-                              
+        if( styleRev )
+        {
+            output += " delta:insertion-change-idref=\"";
+            output += tostr(styleRev);
+            output += "\"";
+        }
+        output += ">";
+        
         ODe_writeUTF8String(m_pParagraphContent, output);
         m_openedODSpan = true;
     }
@@ -1660,18 +1705,6 @@ std::string getODFChangeID( const PP_AttrProp* pAP, UT_uint32 xid )
     // return idref;
 }
 
-const char* UT_getAttribute( const PP_AttrProp* pAP, const char* name, const char* def = 0 )
-{
-    const gchar* pValue;
-    bool ok;
-    
-    ok = pAP->getAttribute( name, pValue );
-    if (!ok)
-    {
-        pValue = def;
-    }
-    return pValue;
-}
 
 bool isTrue( const char* s )
 {
@@ -1755,11 +1788,18 @@ std::string UT_getLatestAttribute( const PP_AttrProp* pAP,
 
 
 
+
+                
+
+
+
 void
 ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
                                              UT_UTF8String& output,
                                              const std::string& additionalElementAttributes,
-                                             bool closeElementWithSlashGreaterThan )
+                                             bool closeElementWithSlashGreaterThan,
+                                             std::list< const PP_Revision* > revlist,
+                                             UT_uint32 ctHighestRemoveLeavingContentStartRevision )
 {
     UT_UTF8String styleName;
     UT_UTF8String str;
@@ -1885,6 +1925,11 @@ ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
                 appendAttribute( output, "xml:id", xmlid );
             }
             output += " ";
+            ChangeTrackingACChange acChange;
+            if( revlist.empty() )
+                output += acChange.createACChange( pAP, ctHighestRemoveLeavingContentStartRevision );
+            else
+                output += acChange.createACChange( revlist );
             output += additionalElementAttributes;
             m_isHeadingParagraph = true;
             
@@ -1902,6 +1947,11 @@ ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
                 appendAttribute( output, "xml:id", xmlid );
             }
             output += " ";
+            ChangeTrackingACChange acChange;
+            if( revlist.empty() )
+                output += acChange.createACChange( pAP, ctHighestRemoveLeavingContentStartRevision );
+            else
+                output += acChange.createACChange( revlist );
             output += additionalElementAttributes;
             
             m_isHeadingParagraph = false;
@@ -1921,6 +1971,25 @@ ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
         output += ">";
     
 }
+
+
+bool
+ODe_Text_Listener::isHeading( const PP_AttrProp* pAP ) const
+{
+    std::string s = UT_getLatestAttribute( pAP, "style", "Normal" );
+    int outlineLevel = m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel(s.c_str());
+    return outlineLevel > 0;
+}
+
+bool
+ODe_Text_Listener::headingStateChanges( const PP_AttrProp* pAPa, const PP_AttrProp* pAPb ) const
+{
+    bool ha = isHeading(pAPa);
+    bool hb = isHeading(pAPb);
+
+    return ha && !hb || hb && !ha;
+}
+
 
 
 /**
@@ -1995,7 +2064,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
         }
     }
     
-    
+    UT_uint32 ctHighestRemoveLeavingContentStartRevision = 0;
     //
     // write out style revisions, this has to handle the change
     // between text:p and text:h if the style changes as shown in
@@ -2018,6 +2087,12 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
     int lastStyleVersion = 0;
     if( const char* revisionString = UT_getAttribute( pAP, "revision", 0 ))
     {
+        //
+        // FIXME: this layering should only be performed for text:p/text:h related changes.
+        //
+
+
+        // 
         //
         // The "ra" and defaultAttrs objects must remain valid for this block
         // as they are used in the ralist colleciton
@@ -2064,14 +2139,24 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
             }
         }
         
-        // The last revision is the current one, so we remove that
-        // as it will be taken care of explicitly with the _openODParagraphToBuffer() call
-        // in the body of this method.
+        // The last revision is the current one, so we remove that as
+        // it will be taken care of explicitly with the
+        // _openODParagraphToBuffer() call in the body of this method.
+        const PP_Revision* lastrev = ralist.back();
         ralist.pop_back();
 
+        typedef std::list< const PP_Revision* > revisionStack_t;
+        revisionStack_t revisionStack;
+        
         //
-        // loop over the older revisions (including the default starting state)
-        // and output the paragraph block element.
+        // loop over the older revisions (including the default
+        // starting state) and output the paragraph block element.
+        // Note that we only have to do this if a style change
+        // mandates an XML element change. For example, going from
+        // Normal to Heading-1 will mean moving from text:p to a
+        // text:h so we have to output something. Going from Heading-1
+        // to Heading-2 can still use the same text:h so that change
+        // doesn't require explicit support here.
         // 
         for( ralist_t::iterator iter = ralist.begin(); iter != ralist.end(); ++iter )
         {
@@ -2081,10 +2166,37 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
             UT_UTF8String o;
             std::string additionalElementAttributes = "";
             bool closeElementWithSlashGreaterThan = true;
+
+            revisionStack.push_back(r);
+            //
+            // check to see if the next revision along will need to change the XML element
+            //
+            {
+                const PP_Revision* nr = lastrev;
+                ralist_t::iterator t = iter;
+                std::advance( t, 1 );
+                if( t != ralist.end() )
+                    nr = *t;
+                
+                if( !headingStateChanges(r,nr) )
+                {
+                    //
+                    // we are not changing between text:p <--> text:h
+                    // but we should record ac:changeXXX in the current XML element
+                    // for these changes, the revisionStack built above helps us to that
+                    // when we output the element.
+                    //
+                    continue;
+                }
+            }
             
+            UT_DEBUGMSG(("ODTCT change of text:p/h revisionStack.sz:%d\n", revisionStack.size() ));
+            ctHighestRemoveLeavingContentStartRevision = r->getId();
             _openODParagraphToBuffer( r, o,
                                       additionalElementAttributes,
-                                      closeElementWithSlashGreaterThan );
+                                      closeElementWithSlashGreaterThan,
+                                      revisionStack );
+            revisionStack.clear();
             UT_DEBUGMSG(("ODTCT xml element:%s\n", o.utf8_str() ));
 
             std::stringstream pre;
@@ -2391,7 +2503,12 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
 
     UT_DEBUGMSG(("opening para closeElementWithSlashGreaterThan:%d\n", startOfParagraphWasDeleted ));
 //    output += "<!--- -->";
-    _openODParagraphToBuffer( pAP, output, additionalElementAttributesStream.str(), startOfParagraphWasDeleted );
+    _openODParagraphToBuffer( pAP,
+                              output,
+                              additionalElementAttributesStream.str(),
+                              startOfParagraphWasDeleted,
+                              std::list< const PP_Revision* >(),
+                              ctHighestRemoveLeavingContentStartRevision );
     
     if( ctp &&
         ctp->getData().m_maxParaRevision > ctp->getData().getVersionWhichIntroducesParagraph() )
@@ -2413,7 +2530,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
         //                         << "\" >"
         //                         << endl;
         paragraphSplitPostamble << output.utf8_str()
-                                << "<delta:inserted-text-start delta:inserted-text-id=\""
+                                << "<delta:inserted-text-start  delta:inserted-text-id=\""
                                 << m_rAuxiliaryData.toChangeID( id )
                                 << "\" />";
         m_ctpTextPBeforeClosingElementStream << "<delta:inserted-text-end delta:inserted-text-idref=\""

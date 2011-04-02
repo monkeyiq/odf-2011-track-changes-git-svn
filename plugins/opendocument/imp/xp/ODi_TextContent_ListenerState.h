@@ -268,6 +268,14 @@ private:
     std::string convertODFStyleNameToAbiStyleName( const std::string odfStyleName,
                                                    ODi_Office_Styles* pStyles,
                                                    bool bOnContentStream );
+
+    //
+    //
+    //
+    PP_RevisionAttr& ctAddACChange( PP_RevisionAttr& ra, const gchar** ppAtts );
+    PP_RevisionAttr  ctGetACChange( const gchar** ppAtts );
+    
+
     
     /*************************************
      * Some other stuff

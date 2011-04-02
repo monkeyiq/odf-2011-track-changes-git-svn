@@ -358,4 +358,70 @@ class ODe_AuxiliaryData
 
 };
 
+std::string getDefaultODFValueForAttribute( const std::string& attr );
+
+/**
+ * Handle the creation of ac:changeXXX XML attributes. This class
+ * tracks the XXX number it is up to, and allows other code to convert
+ * the abiword "revision" attribute into a series of XML attributes
+ * easily. In other words, conversion of relevant parts of an
+ * PP_RevisionAttr to XML ac:change attributes for serialization.
+ *
+ */
+class ChangeTrackingACChange
+{
+    int m_changeID;
+    typedef std::list< std::string > m_attributesToSave_t;
+    m_attributesToSave_t m_attributesToSave;
+    
+  public:
+
+    typedef enum 
+    {
+        INVALID = 0,
+        INSERT = 1,
+        REMOVE,
+        MODIFY
+    } ac_change_t;
+    
+    ChangeTrackingACChange();
+
+    /**
+     * Create an ac:change attribute for the given rev, type and attribute value change.
+     * Note that the revision should show the oldValue for the attribute and change type,
+     * for example if text is bold in revision 2 and then goes to normal in revision 3
+     * the record should be:
+     * 
+     * rev = 3, actype = mopdify, attr = style-name, oldValue = bold.
+     *
+     * The oldValue is optional and is set to the default for a given
+     * attribute if not supplied. If oldValue is not given and
+     * actype==INSERT then the code might not record an oldValue at
+     * all.
+     */
+    std::string createACChange( UT_uint32 revision, ac_change_t actype, const std::string& attr, const std::string& oldValue );
+    std::string createACChange( UT_uint32 revision, ac_change_t actype, const std::string& attr );
+
+    /**
+     * Turn the given "revision" attribte into a series of
+     * ac:changeXXX XML attributes which are returned.
+     */
+    std::string createACChange( const std::string& abwRevisionString, UT_uint32 minRevision = 0 );
+
+    /**
+     * Grab the "revision" attribte from the pAP and write those
+     * attributes to a series of ac:changeXXX XML attributes which are
+     * returned.
+     */
+    std::string createACChange( const PP_AttrProp* pAPcontainingRevisionString, UT_uint32 minRevision = 0 );
+
+    /**
+     * Create ac:changeXXX attributes for the explicit list of revisions given
+     */
+    std::string createACChange( std::list< const PP_Revision* > rl );
+};
+
+    
+
+
 #endif /*ODE_AUXILIARYDATA_H_*/

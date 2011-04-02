@@ -80,6 +80,8 @@ ODi_Style_Style* ODi_Office_Styles::addStyle(const gchar** ppAtts,
     UT_ASSERT(pName);
 
     UT_return_val_if_fail(pFamily, pStyle);
+
+    UT_DEBUGMSG(("XXX addStyle() name:%s family:%s\n", pName, pFamily ));
     
     if(!strcmp(pFamily, "text")) {
         // AbiWord doesn't support two styles with the same name, differing only
@@ -96,12 +98,15 @@ ODi_Style_Style* ODi_Office_Styles::addStyle(const gchar** ppAtts,
                 replacementDisplayName = pDisplayName;
                 replacementDisplayName += "_text";
             }
+
+            UT_DEBUGMSG(("XXX addStyle() replacementName:%s\n", replacementName ));
             
             pStyle = m_textStyleStyles.addStyle(ppAtts, rElementStack,
 						rAbiData,
                                                 &replacementName,
                                                 &replacementDisplayName);
         } else {
+            UT_DEBUGMSG(("XXX addStyle(else) this:%x\n", (void*)this ));
 	  pStyle = m_textStyleStyles.addStyle(ppAtts, rElementStack,rAbiData);
         }
         
@@ -369,6 +374,8 @@ const ODi_Style_Style* ODi_Office_Styles::getParagraphStyle(
 const ODi_Style_Style* ODi_Office_Styles::getTextStyle(const gchar* pStyleName,
                                               bool bOnContentStream) const
 {
+    UT_DEBUGMSG(("XXX getTextStyle() this:%x %s\n", (void*)this, pStyleName ));
+    
     return m_textStyleStyles.getStyle(pStyleName, bOnContentStream);
 }
     

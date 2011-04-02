@@ -33,6 +33,7 @@
 #include <pt_Types.h>
 #include <ut_locale.h>
 #include <fl_BlockLayout.h> // for fl_TabStop
+#include "pp_Revision.h"
 
 // External includes
 #include <ctype.h>
@@ -169,10 +170,13 @@ bool ODe_Style_Style::write(GsfOutput* pODT, const UT_UTF8String& rSpacesOffset)
  * Returns true if the specified PP_AttrProp contains properties that belongs to
  * <style:text-properties> elements
  */
-bool ODe_Style_Style::hasTextStyleProps(const PP_AttrProp* pAP) {
+bool ODe_Style_Style::hasTextStyleProps(const PP_AttrProp* pAP)
+{
     
     const gchar* pValue;
     bool ok;
+
+    UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps() has rev:%d\n", pAP->getAttribute("revision", pValue) ));
     
     ok = pAP->getProperty("color", pValue);
     if (ok && pValue != NULL) {
@@ -227,6 +231,22 @@ bool ODe_Style_Style::hasTextStyleProps(const PP_AttrProp* pAP) {
     ok = pAP->getProperty("text-transform", pValue);
     if (ok && pValue != NULL) {
         return true;
+    }
+
+    ok = pAP->getAttribute("revision", pValue);
+    UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps rev-ok:%d\n", ok ));
+    if (ok && pValue)
+    {
+        UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps rev:%s\n", pValue ));
+        PP_RevisionAttr ra( pValue );
+        const PP_Revision* r = 0;
+        for( int raIdx = ra.getRevisionsCount()-1;
+             raIdx >= 0 && (r = ra.getNthRevision( raIdx ));
+             --raIdx )
+        {
+            if( ODe_Style_Style::hasTextStyleProps( r ) )
+                return true;
+        }
     }
     
     return false;
@@ -1777,6 +1797,25 @@ fetchAttributesFromAbiProps(const PP_AttrProp& rAP) {
        m_transform = pValue;
     }
 
+
+    // FIXME: we should only fetch the properties of the last setting of each
+    // style attribute, is pruneForCumulativeResult() right?
+    ok = rAP.getAttribute("revision", pValue);
+    UT_DEBUGMSG(("ODe_Style_Style::fetchAttributesFromAbiProps rev-ok:%d\n", ok ));
+    if (ok && pValue)
+    {
+        UT_DEBUGMSG(("ODe_Style_Style::fetchAttributesFromAbiProps rev:%s\n", pValue ));
+        PP_RevisionAttr ra( pValue );
+        ra.pruneForCumulativeResult( 0 );
+        const PP_Revision* r = 0;
+        for( int raIdx = ra.getRevisionsCount()-1;
+             raIdx >= 0 && (r = ra.getNthRevision( raIdx ));
+             --raIdx )
+        {
+            ODe_Style_Style::TextProps::fetchAttributesFromAbiProps( *r );
+        }
+    }
+    
 }
 
 

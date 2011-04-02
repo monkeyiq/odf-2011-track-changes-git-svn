@@ -701,7 +701,7 @@ const PP_Revision * PP_RevisionAttr::getLowestGreaterOrEqualRevision(UT_uint32 i
  */
 const PP_Revision * PP_RevisionAttr::getLastRevision() const
 {
-	// since this is rather involved, we will chache the result and
+	// since this is rather involved, we will cache the result and
 	// use the cache if it is uptodate
 	if(m_pLastRevision)
 		return m_pLastRevision;
@@ -1174,4 +1174,32 @@ PP_RevisionType PP_RevisionAttr::getType() const
 {
 	const PP_Revision * r = getLastRevision();
 	return r->getType();
+}
+
+UT_uint32 PP_RevisionAttr::getHighestRevisionNumberWithAttribute( const gchar * attrName ) const
+{
+    const PP_Revision* r = 0;
+
+    for( int raIdx = 0;
+         raIdx < getRevisionsCount() && (r = getNthRevision( raIdx ));
+         raIdx++ )
+    {
+        if( UT_getAttribute( r, attrName, 0 ))
+            return r->getId();
+    }
+    return 0;
+}
+
+
+const char* UT_getAttribute( const PP_AttrProp* pAP, const char* name, const char* def  )
+{
+    const gchar* pValue;
+    bool ok;
+    
+    ok = pAP->getAttribute( name, pValue );
+    if (!ok)
+    {
+        pValue = def;
+    }
+    return pValue;
 }

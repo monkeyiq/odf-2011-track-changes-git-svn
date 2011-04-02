@@ -74,19 +74,6 @@ ODe_Table_Listener::~ODe_Table_Listener() {
 }
 
 
-// FIXME
-static const char* UT_getAttribute( const PP_AttrProp* pAP, const char* name, const char* def = 0 )
-{
-    const gchar* pValue;
-    bool ok;
-    
-    ok = pAP->getAttribute( name, pValue );
-    if (!ok)
-    {
-        pValue = def;
-    }
-    return pValue;
-}
 
 
 /**

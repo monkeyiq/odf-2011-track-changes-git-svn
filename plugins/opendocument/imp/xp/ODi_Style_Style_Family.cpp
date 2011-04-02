@@ -62,41 +62,57 @@ ODi_Style_Style* ODi_Style_Style_Family::addStyle(const gchar** ppAtts,
     pName = UT_getAttribute("style:name", ppAtts);
     UT_ASSERT(pName);
 
-    
-    if (bOnContentStream) {
-        
-        if (pReplacementName) {
-            StyleMap::const_iterator iter = m_styles_contentStream.find(pReplacementName->utf8_str());
+    UT_DEBUGMSG(("XXX Family::addStyle(1) this:%x m_styles.sz:%d bOnContentStream:%d\n",
+                 (void*)this, m_styles.size(), bOnContentStream ));
 
-            if (iter == m_styles_contentStream.end()) {
-	      pStyle = new ODi_Style_Style(rElementStack,rAbiData);
+    
+    if (bOnContentStream)
+    {
+        UT_DEBUGMSG(("XXX Family::addStyle(ocs) this:%x m_styles.sz:%d pReplacementName:%s\n",
+                     (void*)this, m_styles.size(), pReplacementName ));
+        
+        if (pReplacementName)
+        {
+            StyleMap::const_iterator iter = m_styles_contentStream.find(pReplacementName->utf8_str());
+            
+            if (iter == m_styles_contentStream.end())
+            {
+                pStyle = new ODi_Style_Style(rElementStack,rAbiData);
                 
                 m_styles_contentStream.insert(std::make_pair(pReplacementName->utf8_str(),
-                                                                  pStyle));
-                                                   
+                                                             pStyle));
+                
                 pStyle->setName(*pReplacementName);
                 pStyle->setDisplayName(*pReplacementDisplayName);
             }
             
-        } else {
+        }
+        else
+        {
+            UT_DEBUGMSG(("XXX Family::addStyle(no-replacement-name) m_styles_contentStream.size:%d\n", 
+                         m_styles_contentStream.size() ));
+    
             StyleMap::const_iterator iter = m_styles_contentStream.find(pName);
 
-            if (iter == m_styles_contentStream.end()) {
-	      pStyle = new ODi_Style_Style(rElementStack,rAbiData);
+            if (iter == m_styles_contentStream.end())
+            {
+                pStyle = new ODi_Style_Style(rElementStack,rAbiData);
                 
                 m_styles_contentStream.insert(std::make_pair(pName, pStyle));
+                UT_DEBUGMSG(("XXX Family::addStyle(no-replacement-name added) this:%x pName:%s m_styles_contentStream.size:%d\n", 
+                             (void*)this, pName, m_styles_contentStream.size() ));
             }
         }
-        
-        
-        
-    } else {
-        
-        if (pReplacementName) {
+    }
+    else
+    {
+        if (pReplacementName)
+        {
             StyleMap::const_iterator iter = m_styles.find(pReplacementName->utf8_str());
             
-            if (iter == m_styles.end()) {
-	      pStyle = new ODi_Style_Style(rElementStack,rAbiData);
+            if (iter == m_styles.end())
+            {
+                pStyle = new ODi_Style_Style(rElementStack,rAbiData);
                 
                 m_styles.insert(std::make_pair(pReplacementName->utf8_str(), pStyle));
                                                    
@@ -104,11 +120,14 @@ ODi_Style_Style* ODi_Style_Style_Family::addStyle(const gchar** ppAtts,
                 pStyle->setDisplayName(*pReplacementDisplayName);
             }
             
-        } else {
+        }
+        else
+        {
             StyleMap::const_iterator iter = m_styles.find(pName);
             
-            if (iter == m_styles.end()) {
-	      pStyle = new ODi_Style_Style(rElementStack,rAbiData);
+            if (iter == m_styles.end())
+            {
+                pStyle = new ODi_Style_Style(rElementStack,rAbiData);
                 
                 m_styles.insert(std::make_pair(pName, pStyle));
             }
@@ -116,6 +135,8 @@ ODi_Style_Style* ODi_Style_Style_Family::addStyle(const gchar** ppAtts,
     }
 
 
+    UT_DEBUGMSG(("XXX Family::addStyle(e-1) this:%x m_styles.sz:%d pReplacementName:%s\n",
+                 (void*)this, m_styles.size(), pReplacementName ));
     if (pReplacementName != NULL) {
         UT_UTF8String originalName = pName;
         
@@ -127,6 +148,7 @@ ODi_Style_Style* ODi_Style_Style_Family::addStyle(const gchar** ppAtts,
         }
 	}
     
+    UT_DEBUGMSG(("XXX Family::addStyle(e) this:%x m_styles.sz:%d\n", (void*)this, m_styles.size() ));
     return pStyle;
 }
 
@@ -171,6 +193,9 @@ void ODi_Style_Style_Family::_removeEmptyStyles(const StyleMap & map, bool bOnCo
  */
 void ODi_Style_Style_Family::fixStyles()
 {
+    UT_DEBUGMSG(("XXX Family::fixStyles(s) this:%x cs.sz:%d\n", 
+                 (void*)this, m_styles_contentStream.size() ));
+
     // Problem 1: We can't have styles without properties
     //
     // The "Standard" paragraph style usually comes empty
@@ -178,6 +203,9 @@ void ODi_Style_Style_Family::fixStyles()
     
     _removeEmptyStyles(m_styles, false);
     _removeEmptyStyles(m_styles_contentStream, true);
+
+    UT_DEBUGMSG(("XXX Family::fixStyles(e) this:%x cs.sz:%d\n", 
+                 (void*)this, m_styles_contentStream.size() ));
 }
 
 
@@ -236,6 +264,9 @@ void ODi_Style_Style_Family::removeStyleStyle(ODi_Style_Style* pRemovedStyle,
     
     // Remove the style itself
     if (bOnContentStream) {
+        UT_DEBUGMSG(("XXX Family::removeStyleStyle() this:%x style:%s cs.sz:%d\n", 
+                     (void*)this, pRemovedStyle->getName().utf8_str(), m_styles_contentStream.size() ));
+
         m_styles_contentStream.erase(pRemovedStyle->getName().utf8_str());
             
         m_removedStyleStyles_contentStream[pRemovedStyle->getName().utf8_str()]
@@ -403,11 +434,14 @@ const ODi_Style_Style* ODi_Style_Style_Family::getStyle(const gchar* pStyleName,
     UT_return_val_if_fail(pStyleName, NULL);
 
     const ODi_Style_Style* pStyle = NULL;
+    UT_DEBUGMSG(("XXX Family::getStyle(1) %s this:%x m_styles.sz:%d m_styles_contentStream.sz:%d\n",
+                 pStyleName, (void*)this, m_styles.size(), m_styles_contentStream.size() ));
     
     // Is it the default style?
     if (m_pDefaultStyle && (m_pDefaultStyle->getName() == pStyleName)) {
         pStyle = m_pDefaultStyle;
     }
+    UT_DEBUGMSG(("XXX Family::getStyle(2) %s\n", pStyleName ));
     
     if (!pStyle) {
         // It's not the default style. Let's search our style lists.
@@ -427,9 +461,12 @@ const ODi_Style_Style* ODi_Style_Style_Family::getStyle(const gchar* pStyleName,
             }
         }
     }
+    UT_DEBUGMSG(("XXX Family::getStyle(3) %s pStyle:%x\n", pStyleName, pStyle ));
     
     if (!pStyle) {
         // We haven't found it. Have we removed it (done on _fixStyles())?
+
+        UT_DEBUGMSG(("XXX Family::getStyle(3.b) %s\n", pStyleName ));
         
         std::string replacementName;
         
@@ -448,6 +485,7 @@ const ODi_Style_Style* ODi_Style_Style_Family::getStyle(const gchar* pStyleName,
                 replacementName = iter->second;
             }
         }
+        UT_DEBUGMSG(("XXX Family::getStyle(3.d) %s\n", pStyleName ));
         
         if (!replacementName.empty()) {
             // We will send back its replacement.
@@ -465,6 +503,7 @@ const ODi_Style_Style* ODi_Style_Style_Family::getStyle(const gchar* pStyleName,
         }
         
     }
+    UT_DEBUGMSG(("XXX Family::getStyle(4) %s ret:%x\n", pStyleName, pStyle ));
     
     return pStyle;
 }

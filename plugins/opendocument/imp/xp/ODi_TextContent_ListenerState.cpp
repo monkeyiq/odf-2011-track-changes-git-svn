@@ -49,6 +49,7 @@
 
 #include <sstream>
 #include <list>
+#include <set>
 
 
 /************************************************************/
@@ -134,6 +135,81 @@ public:
 private:
     std::size_t     m_highestUsedIndex;
     m_boostArray_t  m_array;
+};
+
+/************************************************************/
+/************************************************************/
+/************************************************************/
+
+class ChangeTrackingACChange
+{
+    std::string nextACValueToken( std::string& v ) const
+    {
+        std::string ret = "";
+        std::string::iterator e = find( v.begin(), v.end(), ',' );
+        copy( v.begin(), e, back_inserter(ret) );
+        if( e != v.end() )
+            ++e;
+        v.replace( v.begin(), e, "" );
+        return ret;
+    }
+    
+    struct acChange
+    { 
+        std::string revision;
+        std::string actype;
+        std::string attr;
+        std::string oldvalue;
+        acChange( std::string revision, std::string actype, std::string attr, std::string oldvalue )
+            :
+            revision(revision),actype(actype),attr(attr),oldvalue(oldvalue)
+        {
+        }
+        UT_uint32 rev() const
+        {
+            return toType<UT_uint32>(revision);
+        }
+    };
+    struct revisionsOrder : public std::binary_function< acChange, acChange, bool >
+    {
+        double operator()( const acChange& x, const acChange& y) const
+        {
+            return std::less<UT_uint32>()( x.rev(), y.rev() );
+        }
+    };
+
+protected:
+
+    ODi_ListenerState* m_ols;
+
+  
+public:
+
+    typedef std::list< acChange > revisionOrderedAttributes_t;
+    typedef std::list< std::string > attributeList_t;
+
+    ChangeTrackingACChange( ODi_ListenerState* ols );
+
+
+    PP_RevisionAttr& ctAddACChange( PP_RevisionAttr& ra, const gchar** ppAtts );
+
+    attributeList_t getACAttributes( const gchar** ppAtts );
+    revisionOrderedAttributes_t& buildRevisionOrderedAttributes( revisionOrderedAttributes_t& ret,
+                                                                 const attributeList_t& al,
+                                                                 const gchar** ppAtts );
+
+    revisionOrderedAttributes_t& sortRevisionOrderedAttributes( revisionOrderedAttributes_t& ret );
+    void shuffleOldValues( revisionOrderedAttributes_t& revisionOrderedAttributes );
+    void removeHighestValues( revisionOrderedAttributes_t& revisionOrderedAttributes );
+    PP_RevisionAttr& createPPRevisionAttrs( revisionOrderedAttributes_t& revisionOrderedAttributes,
+                                            PP_RevisionAttr& ra );
+
+
+protected:
+    
+    void dump( revisionOrderedAttributes_t& revisionOrderedAttributes,
+               const std::string& msg );
+    
 };
 
 /************************************************************/
@@ -233,9 +309,8 @@ ODi_TextContent_ListenerState::convertODFStyleNameToAbiStyleName(
 
 
 void
-ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH(
-    const gchar* pName,
-    const gchar** ppAtts )
+ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH( const gchar* pName,
+                                                                         const gchar** ppAtts )
 {
     if( !m_ctRemoveLeavingContentStack.empty() )
     {
@@ -247,10 +322,8 @@ ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH(
         UT_DEBUGMSG(("text:x INSIDE rlc-start element eeIDRef:%s\n", eeIDRef.c_str() ));
         UT_DEBUGMSG(("text:x style:%s\n", styleName.c_str() ));
 
-        convertODFStyleNameToAbiStyleName( styleName, m_pStyles, m_bOnContentStream );
+        styleName = convertODFStyleNameToAbiStyleName( styleName, m_pStyles, m_bOnContentStream );
         
-        if( styleName == "Heading-1" )
-            styleName = "Heading 1";
         
         // const ODi_Style_Style* pStyle;
         // pStyle = m_pStyles->getParagraphStyle( styleName.c_str(), m_bOnContentStream);
@@ -264,6 +337,8 @@ ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH(
         // {
 //        UT_DEBUGMSG(("text:x pstyle:%s\n", pStyle->getDisplayName().utf8_str() ));
 
+        ctAddACChange( m_ctLeadingElementChangedRevision, ppAtts );
+        
         const gchar ** pProps = 0;
         propertyArray<> ppAtts;
         ppAtts.push_back( "style" );
@@ -786,10 +861,16 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
             UT_ASSERT_HARMLESS(UT_SHOULD_NOT_HAPPEN);
             
         } else {
+            UT_DEBUGMSG(("ODTCT ctRevision.addRevision() pStyleName:%s\n", pStyleName ));
+            
             pStyle = m_pStyles->getTextStyle(pStyleName, m_bOnContentStream);
+            UT_DEBUGMSG(("ODTCT ctRevision.addRevision() pStyle:%x\n", pStyle ));
             
             if (pStyle) {
-            
+
+                UT_DEBUGMSG(("ODTCT ctRevision.addRevision(have pStyle!) pStyleName:%s auto:%d dn:%s\n",
+                             pStyleName, pStyle->isAutomatic(), pStyle->getDisplayName().utf8_str() ));
+                
                 const gchar* ppStyAttr[3];
                 bool ok;
                 UT_UTF8String props;
@@ -2191,6 +2272,22 @@ void ODi_TextContent_ListenerState::_insureInBlock(const gchar ** atts)
 }
 
 
+static UT_uint32 getIntroducingVersion( UT_uint32 cv, const PP_RevisionAttr& ra )
+{
+    UT_uint32 ret = cv;
+    
+    const PP_Revision* r = 0;
+    for( int raIdx = 0;
+         raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
+         raIdx++ )
+    {
+        ret = std::min( r->getId(), ret );
+    }
+    return ret;
+}
+
+
+
 /**
  * Process <text:p> and <text:h> startElement calls
  */
@@ -2221,7 +2318,6 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         std::string ctSplitIDRef           = UT_getAttribute("delta:split-id",   ppParagraphAtts, "" );
         std::string ctMoveIDRef            = UT_getAttribute("delta:move-idref", ppParagraphAtts, "" );
         PP_RevisionAttr ctRevision = m_ctLeadingElementChangedRevision;
-
         
         // DEBUG BLOCK
         {
@@ -2240,6 +2336,29 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
                          UT_getAttribute("delta:insertion-change-idref",  ppParagraphAtts, "" )));
         }
 
+        //
+        // FIXME:
+        // handle the ac:changeXXX attribute which stores
+        // revision,actype,attr,oldValue
+        // and convert that to the needed format for PP_Revision of
+        // revision,eType,attr,newValue
+        // and setup ctRevision to represent the ac:changeXXX attributes.
+        //
+        {
+            PP_RevisionAttr ra;
+            ra.setRevision( m_ctLeadingElementChangedRevision.getXMLstring() );
+            ctAddACChange( ra, ppParagraphAtts );
+            ctRevision.setRevision(ra.getXMLstring());
+
+
+            
+//            PP_RevisionAttr ra = ctGetACChange( ppParagraphAtts );
+//            ctRevision.setRevision(ra.getXMLstring());
+
+            UT_DEBUGMSG(("ac:changeXXX:%s\n", ra.getXMLstring() ));
+        }
+        
+        
         //
         // If we are not in a merge block keep track of the last ID
         //
@@ -2264,7 +2383,7 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
                 UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add startparaA rev:%s\n", ctInsertionChangeIDRef.c_str() ));
                 const gchar ** pAttrs = 0;
                 const gchar ** pProps = 0;
-                ctRevision.addRevision( fromChangeID(ctInsertionChangeIDRef),
+                ctRevision.addRevision( getIntroducingVersion( fromChangeID(ctInsertionChangeIDRef), ctRevision ),
                                         PP_REVISION_ADDITION, pAttrs, pProps );
 //                m_ctMostRecentWritingVersion = ctInsertionChangeIDRef;
             }
@@ -2302,18 +2421,23 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         }
 
         pStyleName = UT_getAttribute ("text:style-name", ppParagraphAtts);
-        if (pStyleName) {
+        if (pStyleName)
+        {
             pStyle = m_pStyles->getParagraphStyle(pStyleName, m_bOnContentStream);
 
-            if (!pStyle) {
+            if (!pStyle)
+            {
                 pStyle = m_pStyles->getTextStyle(pStyleName, m_bOnContentStream);
             }
             
             // Damn, use the default style
-            if (!pStyle) {
+            if (!pStyle)
+            {
                 pStyle = m_pStyles->getDefaultParagraphStyle();
             }
-        } else {
+        }
+        else
+        {
             // Use the default style
             pStyle = m_pStyles->getDefaultParagraphStyle();
         }
@@ -2633,7 +2757,7 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
                 UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add startpara rev:%s\n", ctMostRecentWritingVersion.c_str() ));
                 const gchar ** pAttrs = 0;
                 const gchar ** pProps = 0;
-                ctRevision.addRevision( fromChangeID(ctMostRecentWritingVersion),
+                ctRevision.addRevision( getIntroducingVersion( fromChangeID(ctMostRecentWritingVersion), ctRevision ),
                                         PP_REVISION_ADDITION, pAttrs, pProps );
             }
             if( m_ctParagraphDeletedRevision != -1 )
@@ -2955,6 +3079,304 @@ ODi_TextContent_ListenerState::ctAddRemoveStackGetLast( PP_RevisionType t )
             break;
         }
     }
+    return ret;
+}
+
+//////////////////
+
+
+bool ends_with( const std::string& s, const std::string& ending )
+{
+    if( ending.length() > s.length() )
+        return false;
+    
+    return s.rfind(ending) == (s.length() - ending.length());
+}
+
+bool starts_with( const std::string& s, const std::string& starting )
+{
+    int starting_len = starting.length();
+    int s_len = s.length();
+
+    if( s_len < starting_len )
+        return false;
+    
+    return !s.compare( 0, starting_len, starting );
+}
+struct startswith : public std::binary_function< std::string, std::string, bool >
+{
+    double operator()( const std::string& x, const std::string& y) const
+    { return ::starts_with(x, y); }
+};
+
+std::list< std::string > UT_getAttributeNamesList( const gchar** ppAtts )
+{
+    std::list< std::string > ret;
+	UT_return_val_if_fail( ppAtts, ret );
+
+	const gchar** p = ppAtts;
+
+	while (*p)
+	{
+        ret.push_back( static_cast<const char*>(p[0]) );
+		p += 2;
+	}
+    return ret;
+}
+
+/////////////
+
+
+
+
+
+
+
+ChangeTrackingACChange::ChangeTrackingACChange( ODi_ListenerState* ols )
+    :
+    m_ols(ols)
+{
+}
+
+ChangeTrackingACChange::attributeList_t
+ChangeTrackingACChange::getACAttributes( const gchar** ppAtts )
+{
+    std::list< std::string > attributeList = UT_getAttributeNamesList( ppAtts );
+    attributeList.erase( 
+        std::remove_if( attributeList.begin(), attributeList.end(),
+                        std::not1( std::bind2nd( startswith(), "ac:" ))),
+        attributeList.end() );
+    return attributeList;
+}
+
+ChangeTrackingACChange::revisionOrderedAttributes_t&
+ChangeTrackingACChange::buildRevisionOrderedAttributes( revisionOrderedAttributes_t& ret,
+                                                        const attributeList_t& attributeList,
+                                                        const gchar** ppAtts )
+{
+    //
+    // build revisionOrderedAttributes from attributeList && ppAtts
+    // 
+    for( attributeList_t::const_iterator ai = attributeList.begin();
+         ai != attributeList.end(); ++ai )
+    {
+        std::string attr = *ai;
+        if( const char* v_CSTR = UT_getAttribute( attr.c_str(), ppAtts ) )
+        {
+            std::string v = v_CSTR;
+            // v is like 3,modify,style,Plain Text
+            
+            UT_DEBUGMSG(("ODi_TextContent_ListenerState::ctAddACChange() attr:%s v:%s\n",
+                         attr.c_str(), v.c_str() ));
+
+
+
+            std::string rev    = nextACValueToken( v );
+            std::string actype = nextACValueToken( v );
+            std::string an     = nextACValueToken( v );
+            std::string av     = nextACValueToken( v );
+
+            UT_DEBUGMSG(("ctAddACChange() rev:%s actype:%s an:%s av:%s\n",
+                         rev.c_str(), actype.c_str(), an.c_str(), av.c_str() ));
+            
+            acChange cr( rev, actype, an, av );
+            ret.push_back( cr );
+        }
+    }
+    
+    return ret;
+}
+
+
+ChangeTrackingACChange::revisionOrderedAttributes_t&
+ChangeTrackingACChange::sortRevisionOrderedAttributes( revisionOrderedAttributes_t& ret )
+{
+    //
+    // Sort into revision order
+    //
+    ret.sort( revisionsOrder() );
+    return ret;
+}
+
+ChangeTrackingACChange::revisionOrderedAttributes_t::iterator
+toForward( ChangeTrackingACChange::revisionOrderedAttributes_t::reverse_iterator& ri )
+{
+    ChangeTrackingACChange::revisionOrderedAttributes_t::reverse_iterator r2 = ri;
+    ++r2;
+    return r2.base();
+}
+
+
+void
+ChangeTrackingACChange::shuffleOldValues( revisionOrderedAttributes_t& revisionOrderedAttributes )
+{
+    //
+    // Shuffle the oldvalue contents so that instead of showing what the value
+    // was the records show what the value is changed to become.
+    // 
+    // in revisionOrderedAttributes as read from ODT
+    // 1,insert,style
+    // 2,modify,style,bold
+    // 3,modify,style,foo
+    //   style=bar
+    //
+    // after this conversion we should have
+    // 1,INS,bold
+    // 2,MOD,foo
+    {
+        typedef std::map< std::string, std::string > lastSeenAttributeCache_t;
+        lastSeenAttributeCache_t lastSeenAttributeCache;
+        
+        for( revisionOrderedAttributes_t::reverse_iterator ri = revisionOrderedAttributes.rbegin();
+             ri != revisionOrderedAttributes.rend(); ++ri )
+        {
+            acChange cr = *ri;
+            
+            UT_DEBUGMSG(("ctAddACChange(x) rev:%s actype:%s an:%s av:%s\n",
+                         cr.revision.c_str(), cr.actype.c_str(), cr.attr.c_str(), cr.oldvalue.c_str() ));
+            if( !lastSeenAttributeCache.count(cr.attr) )
+            {
+                lastSeenAttributeCache.insert( make_pair( cr.attr, cr.oldvalue ));
+            }
+            else
+            {
+                std::swap( ri->oldvalue, lastSeenAttributeCache[cr.attr] );
+            }
+        }
+    }
+}
+
+void
+ChangeTrackingACChange::removeHighestValues( revisionOrderedAttributes_t& revisionOrderedAttributes )
+{
+    typedef std::set< std::string > lastSeenAttributeCache_t;
+    lastSeenAttributeCache_t lastSeenAttributeCache;
+
+    if(revisionOrderedAttributes.empty())
+        return;
+    
+    typedef std::list< revisionOrderedAttributes_t::iterator > purgeCache_t;
+    purgeCache_t purgeCache;
+    
+
+    
+    for( revisionOrderedAttributes_t::reverse_iterator ri = revisionOrderedAttributes.rbegin();
+         ri != revisionOrderedAttributes.rend(); ++ri )
+    {
+        acChange cr = *ri;
+
+        if( !lastSeenAttributeCache.count(cr.attr) )
+        {
+            UT_DEBUGMSG(("removeHighest() removing rev:%s actype:%s an:%s av:%s\n",
+                         cr.revision.c_str(), cr.actype.c_str(), cr.attr.c_str(), cr.oldvalue.c_str() ));
+            purgeCache.push_back( toForward(ri) );
+            lastSeenAttributeCache.insert( cr.attr );
+        }
+    }
+
+    UT_DEBUGMSG(("removeHighest() purgeCache.sz:%d\n", purgeCache.size() ));
+    while(!purgeCache.empty())
+    {
+        revisionOrderedAttributes_t::iterator iter = purgeCache.front();
+        purgeCache.pop_front();
+
+        acChange cr = *iter;
+        UT_DEBUGMSG(("removeHighest(r) removing rev:%s actype:%s an:%s av:%s\n",
+                     cr.revision.c_str(), cr.actype.c_str(), cr.attr.c_str(), cr.oldvalue.c_str() ));
+
+        revisionOrderedAttributes.erase( iter );
+    }
+    
+}
+
+
+void
+ChangeTrackingACChange::dump( revisionOrderedAttributes_t& revisionOrderedAttributes,
+                              const std::string& msg )
+{
+    UT_DEBUGMSG(("dump() %s\n", msg.c_str() ));
+    
+    for( revisionOrderedAttributes_t::iterator ri = revisionOrderedAttributes.begin();
+         ri != revisionOrderedAttributes.end(); ++ri )
+    {
+        acChange cr = *ri;
+        
+        UT_DEBUGMSG(("dump() rev:%s type:%s attr:%s oldv:%s\n",
+                     cr.revision.c_str(), cr.actype.c_str(),
+                     cr.attr.c_str(), cr.oldvalue.c_str()  ));
+    }
+}
+
+
+
+PP_RevisionAttr&
+ChangeTrackingACChange::createPPRevisionAttrs( revisionOrderedAttributes_t& revisionOrderedAttributes,
+                                               PP_RevisionAttr& ra )
+{
+
+    //
+    // Actually convert revisionOrderedAttributes into records in the PP_RevisionAttr
+    //
+    for( revisionOrderedAttributes_t::iterator ri = revisionOrderedAttributes.begin();
+         ri != revisionOrderedAttributes.end(); ++ri )
+    {
+        acChange cr = *ri;
+        const gchar ** pProps = 0;
+        propertyArray<> ppAtts;
+
+        PP_RevisionType eType = PP_REVISION_FMT_CHANGE;
+        // eType = PP_REVISION_ADDITION;
+        
+        ppAtts.push_back( cr.attr.c_str() );
+        ppAtts.push_back( cr.oldvalue.c_str() );
+        ra.addRevision( m_ols->fromChangeID( cr.revision ),
+                        eType, ppAtts.data(), pProps );
+    }
+    
+    return ra;
+}
+
+
+PP_RevisionAttr&
+ChangeTrackingACChange::ctAddACChange( PP_RevisionAttr& ra, const gchar** ppAtts )
+{
+    attributeList_t attributeList = getACAttributes( ppAtts );
+
+    revisionOrderedAttributes_t revisionOrderedAttributes;
+    buildRevisionOrderedAttributes( revisionOrderedAttributes, attributeList, ppAtts );
+    dump( revisionOrderedAttributes, "sorting..." );
+    sortRevisionOrderedAttributes( revisionOrderedAttributes );
+
+    dump( revisionOrderedAttributes, "about to shuffle" );
+    shuffleOldValues( revisionOrderedAttributes );
+    dump( revisionOrderedAttributes, "about to remove highest" );
+    removeHighestValues( revisionOrderedAttributes );
+
+    dump( revisionOrderedAttributes, "about to make PP_Revision" );
+    ra = createPPRevisionAttrs( revisionOrderedAttributes, ra );
+
+    UT_DEBUGMSG(("ra:%s\n", ra.getXMLstring() ));
+    
+    return ra;
+}
+
+
+
+PP_RevisionAttr&
+ODi_TextContent_ListenerState::ctAddACChange( PP_RevisionAttr& ra, const gchar** ppAtts )
+{
+    UT_DEBUGMSG(("ODi_TextContent_ListenerState::ctAddACChange() top\n" ));
+
+    ChangeTrackingACChange ct( this );
+    ra = ct.ctAddACChange( ra, ppAtts );
+    return ra;
+}
+
+PP_RevisionAttr
+ODi_TextContent_ListenerState::ctGetACChange( const gchar** ppAtts )
+{
+    PP_RevisionAttr ret;
+    ctAddACChange( ret, ppAtts );
     return ret;
 }
 

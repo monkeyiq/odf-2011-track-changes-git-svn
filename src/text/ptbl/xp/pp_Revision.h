@@ -27,6 +27,8 @@
 
 class PD_Document;
 
+ABI_EXPORT const char* UT_getAttribute( const PP_AttrProp* pAP, const char* name, const char* def = 0 );
+
 typedef enum {
 	PP_REVISION_NONE             = 0,
 	PP_REVISION_ADDITION         = 0x01,
@@ -159,13 +161,15 @@ class ABI_EXPORT PP_RevisionAttr
 	/*! please note that the following are convenience functions; if
 	    you need to make repeated enqueries, it is better to call
 	    getGreatestLesserOrEqualRevision() or getLastRevision() and
-	    querie the returned PP_Revision object.
+	    query the returned PP_Revision object.
     */
 	bool                  isVisible(UT_uint32 id) const;
 	bool                  hasProperty(UT_uint32 iId, const gchar * pName, const gchar * &pValue) const;
 	bool                  hasProperty(const gchar * pName, const gchar * &pValue) const;
 	PP_RevisionType       getType(UT_uint32 iId) const;
 	PP_RevisionType       getType() const;
+
+    UT_uint32             getHighestRevisionNumberWithAttribute( const gchar * pName ) const;
 #if 0
 	const UT_Vector *     getProps(UT_uint32 iId);
 	const UT_Vector *     getProps();

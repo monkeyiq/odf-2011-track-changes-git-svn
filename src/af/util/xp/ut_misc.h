@@ -89,6 +89,8 @@ ABI_EXPORT const gchar* UT_getAttribute( const gchar* name,
 ABI_EXPORT const gchar* UT_getAttribute( const gchar* name,
                                          const gchar** atts, const gchar* def );
 
+
+
 ABI_EXPORT gchar ** UT_cloneAndDecodeAttributes (const gchar ** attrs);
 
 UT_sint32 signedHiWord(UT_uint32 dw);
