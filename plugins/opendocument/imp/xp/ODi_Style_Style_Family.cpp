@@ -47,12 +47,12 @@ ODi_Style_Style_Family::~ODi_Style_Style_Family()
  * @param pReplacementName Name to replace the actual name of the style that is
  *                         being added. NULL if the name shouldn't be replaced.
  */
-ODi_Style_Style* ODi_Style_Style_Family::addStyle(const gchar** ppAtts,
-                             ODi_ElementStack& rElementStack,
-			     ODi_Abi_Data & rAbiData,
-                             UT_UTF8String* pReplacementName,
-                             UT_UTF8String* pReplacementDisplayName) {
-                                
+ODi_Style_Style* ODi_Style_Style_Family::addStyle( const gchar** ppAtts,
+                                                   ODi_ElementStack& rElementStack,
+                                                   ODi_Abi_Data & rAbiData,
+                                                   UT_UTF8String* pReplacementName,
+                                                   UT_UTF8String* pReplacementDisplayName)
+{
     ODi_Style_Style* pStyle = NULL;
     bool bOnContentStream;
     const gchar* pName;
@@ -68,8 +68,9 @@ ODi_Style_Style* ODi_Style_Style_Family::addStyle(const gchar** ppAtts,
     
     if (bOnContentStream)
     {
-        UT_DEBUGMSG(("XXX Family::addStyle(ocs) this:%x m_styles.sz:%d pReplacementName:%s\n",
-                     (void*)this, m_styles.size(), pReplacementName ));
+        UT_DEBUGMSG(("XXX Family::addStyle(ocs) this:%x m_styles.sz:%d\n", (void*)this, m_styles.size() ));
+        if( pReplacementName )
+            UT_DEBUGMSG(("XXX Family::addStyle(ocs) pReplacementName:%s\n", pReplacementName->utf8_str() ));
         
         if (pReplacementName)
         {
@@ -135,8 +136,10 @@ ODi_Style_Style* ODi_Style_Style_Family::addStyle(const gchar** ppAtts,
     }
 
 
-    UT_DEBUGMSG(("XXX Family::addStyle(e-1) this:%x m_styles.sz:%d pReplacementName:%s\n",
-                 (void*)this, m_styles.size(), pReplacementName ));
+    UT_DEBUGMSG(("XXX Family::addStyle(e-1) this:%x m_styles.sz:%d\n", (void*)this, m_styles.size() ));
+    if( pReplacementName )
+        UT_DEBUGMSG(("XXX Family::addStyle(e-1) pReplacementName:%s\n", pReplacementName->utf8_str() ));
+    
     if (pReplacementName != NULL) {
         UT_UTF8String originalName = pName;
         

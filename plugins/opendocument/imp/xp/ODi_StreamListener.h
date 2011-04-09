@@ -40,6 +40,7 @@
 class ODi_Office_Styles;
 class ODi_Postpone_ListenerState;
 class ODi_Abi_Data;
+class ODi_Abi_ChangeTrackingRevisionMapping;
 
 // AbiWord classes
 class PD_Document;
@@ -56,9 +57,12 @@ class ODi_StreamListener : public virtual UT_XML::Listener {
 
 public:
 
-    ODi_StreamListener(PD_Document* pAbiDocument, GsfInfile* pGsfInfile,
-                      ODi_Office_Styles* pStyles, ODi_Abi_Data& rAbiData,
-                      ODi_ElementStack* pElementStack = NULL);
+    ODi_StreamListener( PD_Document* pAbiDocument,
+                        GsfInfile* pGsfInfile,
+                        ODi_Office_Styles* pStyles,
+                        ODi_Abi_Data& rAbiData,
+                        ODi_Abi_ChangeTrackingRevisionMapping& rAbiCTMap,
+                        ODi_ElementStack* pElementStack = NULL );
     
     virtual ~ODi_StreamListener();
     
@@ -96,6 +100,7 @@ private:
     GsfInfile* m_pGsfInfile;
     ODi_Office_Styles* m_pStyles;
     ODi_Abi_Data& m_rAbiData;
+    ODi_Abi_ChangeTrackingRevisionMapping& m_rAbiCTMap;
     ODi_FontFaceDecls m_fontFaceDecls;
 
     // Used by the current listener state to signal state changes, etc.

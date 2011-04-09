@@ -37,6 +37,7 @@
 #include "pf_Frag.h"
 #include "ie_exp_RTF.h"
 #include "ut_units.h"
+#include "ODi_Abi_ChangeTrackingRevisionMapping.h"
 
 // AbiWord includes
 #include <ut_misc.h>
@@ -57,10 +58,13 @@ ODi_TrackedChanges_ListenerState::ODi_TrackedChanges_ListenerState (
     PD_Document* pDocument,
     ODi_Office_Styles* pStyles,
     ODi_ElementStack& rElementStack,
-    ODi_Abi_Data& rAbiData)
-    : ODi_ListenerState("TrackedChanges", rElementStack)
+    ODi_Abi_Data& rAbiData,
+    ODi_Abi_ChangeTrackingRevisionMapping* pAbiCTMap
+    )
+    : ODi_ListenerState( "TrackedChanges", rElementStack )
     , m_pAbiDocument ( pDocument )
     , m_pStyles(pStyles)
+    , m_rAbiData(rAbiData)
     , m_elementParsingLevel(0)
     , m_bAcceptingText(false)
     , m_ctCurrentRevision(-1)
@@ -69,9 +73,12 @@ ODi_TrackedChanges_ListenerState::ODi_TrackedChanges_ListenerState (
     , m_bPendingTransactionAuthor(false)
     , m_bPendingTransactionDate(false)
     , m_bPendingTransactionChangeLog(false)
+    , m_nextTransactionID(1)
 {
     UT_ASSERT_HARMLESS(m_pAbiDocument);
     UT_ASSERT_HARMLESS(m_pStyles);
+
+    setChangeTrackingRevisionMapping( pAbiCTMap );
 }
 
 
@@ -100,6 +107,12 @@ void ODi_TrackedChanges_ListenerState::startElement ( const gchar* pName,
         int autoRevisioning = toType<int>(UT_getAttribute("delta:auto-revisioning",  ppAtts, "0" ));
         UT_uint32 currRevision = toType<UT_uint32>(UT_getAttribute("delta:current-revision",  ppAtts, "-1" ));
 
+        showRevisions=1;
+        markRevisions=1;
+        currRevision=0;
+        autoRevisioning=0;
+        
+        
         UT_DEBUGMSG(("tc, delta:tracked-changes show-rev:%d mark:%d curr:%d\n",
                      showRevisions, markRevisions, currRevision ));
         
@@ -113,7 +126,11 @@ void ODi_TrackedChanges_ListenerState::startElement ( const gchar* pName,
         
     } else if (!strcmp(pName, "delta:change-transaction" )) {
 
-        m_ctCurrentTransactionID = toType<UT_uint32>(UT_getAttribute("delta:change-id", ppAtts, "-1" ));
+        std::string txtid = UT_getAttribute("delta:change-id", ppAtts, "-1" );
+//        m_ctCurrentTransactionID = toType<UT_uint32>(txtid.c_str());
+        m_ctCurrentTransactionID = m_nextTransactionID;
+        ++m_nextTransactionID;
+        m_pAbiCTMap->ensureMapping( txtid, m_ctCurrentTransactionID );
         if( m_ctCurrentTransactionID == -1 )
         {
             // error

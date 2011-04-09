@@ -4,6 +4,7 @@
 #include "ODi_StartTag.h"
 #include "ODi_ElementStack.h"
 #include <ut_conversion.h>
+#include "ODi_Abi_ChangeTrackingRevisionMapping.h"
 
 UT_uint32
 ODi_ListenerState::getImplicitRemovalVersion()
@@ -40,9 +41,9 @@ ODi_ListenerState::updateToHandleRemovalVersion( PP_RevisionAttr& ra )
     }
     else if( const ODi_StartTag* st = m_rElementStack.getClosestElement( "delta:removed-content" ))
     {
-        if( const char* v = st->getAttributeValue( "delta:removal-change-idref" ))
+        if( const char* ver = st->getAttributeValue( "delta:removal-change-idref" ))
         {
-            ra.addRevision( fromChangeID(v),
+            ra.addRevision( fromChangeID(ver),
                             PP_REVISION_DELETION,
                             pAttrs, pProps );
         }
@@ -53,6 +54,9 @@ ODi_ListenerState::updateToHandleRemovalVersion( PP_RevisionAttr& ra )
 UT_uint32
 ODi_ListenerState::fromChangeID( const std::string s )
 {
+    if( m_pAbiCTMap )
+        return m_pAbiCTMap->getMapping( s );
+    UT_DEBUGMSG(("BAD: fromChangeID() called without a change-id to abiword revision mapping!\n" ));
     return toType<UT_uint32>( s );
 }
 

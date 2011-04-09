@@ -35,6 +35,8 @@
 #include <pd_Document.h>
 #include <ut_locale.h>
 
+#include <sstream>
+
 /**
  * 
  */
@@ -200,47 +202,42 @@ void ODi_Style_PageLayout::_parseHeaderFooterProperties(const gchar** ppAtts) {
     }
 }
 
+UT_UTF8String&
+ODi_Style_PageLayout::_parsePageDimension( UT_UTF8String& ret, const gchar* pVal )
+{
+    if( pVal )
+    {
+        double v = UT_convertToDimension( pVal, DIM_MM );
+//        UT_DEBUGMSG(("_parsePageDimension() pVal:%s v:%f\n", pVal, v ));
+        std::stringstream ss;
+        ss << v << "mm";
+        ret = ss.str();
+    }
+    return ret;
+}
+
+
 
 /**
  * Parses the <style:page-layout-properties> start tag.
  */
-void ODi_Style_PageLayout::_parsePageLayoutProperties(const gchar** ppAtts) {
+void
+ODi_Style_PageLayout::_parsePageLayoutProperties(const gchar** ppAtts) {
     
     const gchar* pVal = NULL;
-    
-    pVal = UT_getAttribute ("fo:page-width", ppAtts);
-    if (pVal) {
-        m_pageWidth = pVal;
-    }
 
-    pVal = UT_getAttribute ("fo:page-height", ppAtts);
-    if (pVal) {
-        m_pageHeight = pVal;
-    }
+    _parsePageDimension( m_pageWidth,     UT_getAttribute ("fo:page-width",   ppAtts) );
+    _parsePageDimension( m_pageHeight,    UT_getAttribute ("fo:page-height",  ppAtts) );
+    _parsePageDimension( m_marginLeft,    UT_getAttribute ("fo:margin-left",  ppAtts) );
+    _parsePageDimension( m_marginTop,     UT_getAttribute ("fo:margin-top",   ppAtts) );
+    _parsePageDimension( m_marginRight,   UT_getAttribute ("fo:margin-right", ppAtts) );
+    _parsePageDimension( m_marginBottom,  UT_getAttribute ("fo:margin-bottom",ppAtts) );
+    
+
 
     pVal = UT_getAttribute ("style:print-orientation", ppAtts);
     if (pVal) {
         m_printOrientation = pVal;
-    }
-
-    pVal = UT_getAttribute ("fo:margin-left", ppAtts);
-    if (pVal) {
-        m_marginLeft = pVal;
-    }
-
-    pVal = UT_getAttribute ("fo:margin-top", ppAtts);
-    if (pVal) {
-        m_marginTop = pVal;
-    }
-
-    pVal = UT_getAttribute ("fo:margin-right", ppAtts);
-    if (pVal) {
-        m_marginRight = pVal;
-    }
-
-    pVal = UT_getAttribute ("fo:margin-bottom", ppAtts);
-    if (pVal) {
-        m_marginBottom = pVal;
     }
 
     pVal = UT_getAttribute ("fo:background-color", ppAtts);

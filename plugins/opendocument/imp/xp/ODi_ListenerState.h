@@ -30,6 +30,7 @@
 class ODi_ListenerStateAction;
 class ODi_ElementStack;
 class PP_RevisionAttr;
+class ODi_Abi_ChangeTrackingRevisionMapping;
 
 
 /**
@@ -39,10 +40,16 @@ class ODi_ListenerState {
 
 public:
     
-    ODi_ListenerState(const char* pStateName, ODi_ElementStack& rElementStack)
-    	: m_stateName(pStateName), m_rElementStack(rElementStack) {}
+  ODi_ListenerState( const char* pStateName,
+                     ODi_ElementStack& rElementStack )
+      : m_stateName(pStateName)
+        , m_rElementStack(rElementStack)
+        , m_pAbiCTMap(0)
+    {}
         
     virtual ~ODi_ListenerState() {}
+
+  
     
     virtual void startElement (const gchar* pName, const gchar** ppAtts,
                                ODi_ListenerStateAction& rAction) = 0;
@@ -63,6 +70,12 @@ protected:
 
     UT_String m_stateName;
     ODi_ElementStack& m_rElementStack;
+    ODi_Abi_ChangeTrackingRevisionMapping* m_pAbiCTMap;
+
+    void setChangeTrackingRevisionMapping( ODi_Abi_ChangeTrackingRevisionMapping* pAbiCTMap )
+    {
+        m_pAbiCTMap = pAbiCTMap;
+    }
 };
 
 #endif //_ODI_LISTENERSTATE_H_

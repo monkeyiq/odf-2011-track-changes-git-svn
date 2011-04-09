@@ -309,3 +309,4 @@ void ODi_Abi_Data::_splitDirectoryAndFileName(const gchar* pHRef, UT_String& dir
     
     fileName = href.substr(iStart, nChars);
 }
+

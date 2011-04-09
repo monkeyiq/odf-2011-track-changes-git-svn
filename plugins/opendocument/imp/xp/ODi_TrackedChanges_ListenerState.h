@@ -48,7 +48,8 @@ class PP_RevisionAttr;
 /**
  * It parses the <delta:tracked-changes> tree.
  */
-class ODi_TrackedChanges_ListenerState : public ODi_ListenerState {
+class ODi_TrackedChanges_ListenerState : public ODi_ListenerState
+{
 
 public:
 
@@ -56,7 +57,8 @@ public:
         PD_Document* pDocument,
         ODi_Office_Styles* pStyles,
         ODi_ElementStack& rElementStack,
-	ODi_Abi_Data & rAbiData);
+        ODi_Abi_Data & rAbiData,
+        ODi_Abi_ChangeTrackingRevisionMapping* rAbiCTMap );
         
     virtual ~ODi_TrackedChanges_ListenerState();
 
@@ -73,6 +75,7 @@ private:
 
     PD_Document* m_pAbiDocument;
     ODi_Office_Styles* m_pStyles;
+    ODi_Abi_Data& m_rAbiData;
 
     bool m_bAcceptingText;
     UT_sint8 m_elementParsingLevel;
@@ -85,6 +88,7 @@ private:
     // ODT Change Tracking
     UT_uint32 m_ctCurrentRevision;
     UT_uint32 m_ctCurrentTransactionID;
+    UT_uint32 m_nextTransactionID;
     bool m_bPendingTransaction;
     bool m_bPendingTransactionAuthor;
     bool m_bPendingTransactionDate;

@@ -32,6 +32,7 @@
 #include "../../common/xp/ODc_Crypto.h"
 #include "ODi_Office_Styles.h"
 #include "ODi_Abi_Data.h"
+#include "ODi_Abi_ChangeTrackingRevisionMapping.h"
 
 // AbiWord inlcudes
 #include <ie_imp.h>
@@ -88,6 +89,7 @@ private:
     ODi_StreamListener* m_pStreamListener;
     ODi_Office_Styles m_styles;
     ODi_Abi_Data* m_pAbiData;
+    ODi_Abi_ChangeTrackingRevisionMapping* m_pAbiChangeTrackingRevisionMapping;
     
 };
 

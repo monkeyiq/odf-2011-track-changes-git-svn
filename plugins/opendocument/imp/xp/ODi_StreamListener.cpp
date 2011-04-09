@@ -41,15 +41,17 @@
 /**
  * Constructor
  */
-ODi_StreamListener::ODi_StreamListener(PD_Document* pAbiDocument,
-                                     GsfInfile* pGsfInfile,
-                                     ODi_Office_Styles* pStyles,
-                                     ODi_Abi_Data& rAbiData,
-                                     ODi_ElementStack* pElementStack)
+ODi_StreamListener::ODi_StreamListener( PD_Document* pAbiDocument,
+                                        GsfInfile* pGsfInfile,
+                                        ODi_Office_Styles* pStyles,
+                                        ODi_Abi_Data& rAbiData,
+                                        ODi_Abi_ChangeTrackingRevisionMapping& rAbiCTMap,
+                                        ODi_ElementStack* pElementStack )
     : m_pAbiDocument(pAbiDocument),
       m_pGsfInfile(pGsfInfile),
       m_pStyles(pStyles),
       m_rAbiData(rAbiData),
+      m_rAbiCTMap(rAbiCTMap),
       m_fontFaceDecls(*pElementStack),
       m_currentAction(ODI_NONE),
       m_pCurrentState(NULL),
@@ -465,16 +467,18 @@ ODi_ListenerState* ODi_StreamListener::_createState(const char* pStateName) {
 
     } else if (!strcmp("TextContent", pStateName)) {
         
-        pState = new ODi_TextContent_ListenerState(m_pAbiDocument, m_pStyles,
-						   *m_pElementStack,
-						   m_rAbiData);
+        pState = new ODi_TextContent_ListenerState( m_pAbiDocument, m_pStyles,
+                                                    *m_pElementStack,
+                                                    m_rAbiData,
+                                                    &m_rAbiCTMap );
 
         
     } else if (!strcmp("TrackedChanges", pStateName)) {
         
-        pState = new ODi_TrackedChanges_ListenerState(m_pAbiDocument, m_pStyles,
-						   *m_pElementStack,
-						   m_rAbiData);
+        pState = new ODi_TrackedChanges_ListenerState( m_pAbiDocument, m_pStyles,
+                                                       *m_pElementStack,
+                                                       m_rAbiData,
+                                                       &m_rAbiCTMap );
         
     } else if (!strcmp("Frame", pStateName)) {
         
@@ -505,9 +509,9 @@ void ODi_StreamListener::_resumeParsing(ODi_Postpone_ListenerState* pPostponeSta
     
     pXMLRecorder = pPostponeState->getXMLRecorder();    
     
-    ODi_StreamListener streamListener(m_pAbiDocument, m_pGsfInfile,
-                                     m_pStyles, m_rAbiData,
-                                     m_pElementStack);
+    ODi_StreamListener streamListener( m_pAbiDocument, m_pGsfInfile,
+                                       m_pStyles, m_rAbiData, m_rAbiCTMap,
+                                       m_pElementStack);
                                      
     streamListener.setState(pPostponeState->getParserState(),
                             pPostponeState->getDeleteParserStateWhenPop());

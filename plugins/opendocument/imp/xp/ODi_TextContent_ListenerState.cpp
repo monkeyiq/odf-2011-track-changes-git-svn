@@ -160,9 +160,9 @@ class ChangeTrackingACChange
         std::string actype;
         std::string attr;
         std::string oldvalue;
-        acChange( std::string revision, std::string actype, std::string attr, std::string oldvalue )
+        acChange( std::string _revision, std::string _actype, std::string _attr, std::string _oldvalue )
             :
-            revision(revision),actype(actype),attr(attr),oldvalue(oldvalue)
+            revision(_revision),actype(_actype),attr(_attr),oldvalue(_oldvalue)
         {
         }
         UT_uint32 rev() const
@@ -220,52 +220,56 @@ protected:
  * Constructor
  */
 ODi_TextContent_ListenerState::ODi_TextContent_ListenerState (
-                PD_Document* pDocument,
-                ODi_Office_Styles* pStyles,
-                ODi_ElementStack& rElementStack,
-		ODi_Abi_Data& rAbiData)
-                : ODi_ListenerState("TextContent", rElementStack),
-                  m_pAbiDocument ( pDocument ),
-                  m_pStyles(pStyles),
-                  m_bAcceptingText(false),
-                  m_bOpenedBlock(false),
-                  m_inAbiSection(false),
-                  m_openedFirstAbiSection(false),
-                  m_bPendingSection(false),
-                  m_currentODSection(ODI_SECTION_NONE),
-                  m_elementParsingLevel(0),
-                  m_pCurrentTOCParser(NULL),
-                  m_bOnContentStream(false),
-                  m_pCurrentListStyle(NULL),
-                  m_listLevel(0),
-                  m_alreadyDefinedAbiParagraphForList(false),
-                  m_pendingNoteAnchorInsertion(false),
-                  m_bPendingAnnotation(false),
-                  m_bPendingAnnotationAuthor(false),
-                  m_bPendingAnnotationDate(false),
-                  m_iAnnotation(0),
-                  m_bPageReferencePending(false),
-                  m_iPageNum(0),
-                  m_dXpos(0.0),
-                  m_dYpos(0.0),
-                  m_sProps(""),
-                  m_rAbiData(rAbiData),
-                  m_bPendingTextbox(false),
-                  m_bHeadingList(false),
-                  m_prevLevel(0),
-                  m_bContentWritten(false)
-                , m_ctParagraphDeletedRevision(-1)
-//                , m_ctMostRecentWritingVersion("")
-                , m_ctHaveSpanFmt(false)
-                , m_ctHaveParagraphFmt(false)
-                , m_ctSpanDepth(0)
-                , m_mergeIsInsideTrailingPartialContent(false)
-                , m_mergeIsInsideIntermediateContent(false)
-                , m_paragraphNestingLevel(0)
-                , m_ctInsideRemoveLeavingContentStartElement(false)
+    PD_Document* pDocument,
+    ODi_Office_Styles* pStyles,
+    ODi_ElementStack& rElementStack,
+    ODi_Abi_Data& rAbiData,
+    ODi_Abi_ChangeTrackingRevisionMapping* pAbiCTMap
+    )
+    : ODi_ListenerState("TextContent", rElementStack),
+      m_pAbiDocument ( pDocument ),
+      m_pStyles(pStyles),
+      m_bAcceptingText(false),
+      m_bOpenedBlock(false),
+      m_inAbiSection(false),
+      m_openedFirstAbiSection(false),
+      m_bPendingSection(false),
+      m_currentODSection(ODI_SECTION_NONE),
+      m_elementParsingLevel(0),
+      m_pCurrentTOCParser(NULL),
+      m_bOnContentStream(false),
+      m_pCurrentListStyle(NULL),
+      m_listLevel(0),
+      m_alreadyDefinedAbiParagraphForList(false),
+      m_pendingNoteAnchorInsertion(false),
+      m_bPendingAnnotation(false),
+      m_bPendingAnnotationAuthor(false),
+      m_bPendingAnnotationDate(false),
+      m_iAnnotation(0),
+      m_bPageReferencePending(false),
+      m_iPageNum(0),
+      m_dXpos(0.0),
+      m_dYpos(0.0),
+      m_sProps(""),
+      m_rAbiData(rAbiData),
+      m_bPendingTextbox(false),
+      m_bHeadingList(false),
+      m_prevLevel(0),
+      m_bContentWritten(false)
+    , m_ctParagraphDeletedRevision(-1)
+//  , m_ctMostRecentWritingVersion("")
+    , m_ctHaveSpanFmt(false)
+    , m_ctHaveParagraphFmt(false)
+    , m_ctSpanDepth(0)
+    , m_mergeIsInsideTrailingPartialContent(false)
+    , m_mergeIsInsideIntermediateContent(false)
+    , m_paragraphNestingLevel(0)
+    , m_ctInsideRemoveLeavingContentStartElement(false)
 {
     UT_ASSERT_HARMLESS(m_pAbiDocument);
     UT_ASSERT_HARMLESS(m_pStyles);
+
+    setChangeTrackingRevisionMapping( pAbiCTMap );
 }
 
 
@@ -663,14 +667,15 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
 
         UT_DEBUGMSG(("delta:removed-content opening...\n"));
         
-        std::string ctTextID = UT_getAttribute("delta:removed-text-id", ppAtts, "" );
+//        std::string ctTextID = UT_getAttribute("delta:removed-text-id", ppAtts, "" );
         std::string idref    = UT_getAttribute("delta:removal-change-idref", ppAtts, "");
         std::string moveID   = UT_getAttribute("delta:move-id", ppAtts, "" );
 
         m_ctMoveID = moveID;
         m_ctAddRemoveStack.push_back( make_pair( PP_REVISION_DELETION, idref ));
-        
-        if( ctTextID.empty() )
+
+        if( !m_paragraphNestingLevel )        
+//        if( ctTextID.empty() )
         {
             //
             // The paragraph itself has been deleted.
@@ -698,7 +703,8 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
 
             PP_RevisionAttr ctRevision;
 
-            UT_DEBUGMSG(("delta:removed-content-start tid:%s idref:%s\n", ctTextID.c_str(), idref.c_str() ));
+//            UT_DEBUGMSG(("delta:removed-content-start tid:%s\n",   ctTextID.c_str() ));
+            UT_DEBUGMSG(("delta:removed-content-start idref:%s\n", idref.c_str() ));
             ctAddRemoveStackSetup( ctRevision, m_ctAddRemoveStack );
             
 //            UT_DEBUGMSG(("delta:removed-content-start added in revision:%s removed in:%s\n",
@@ -1307,6 +1313,11 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
         m_ctParagraphDeletedRevision = -1;
         _insureInSection();
         rAction.pushState("Table");
+
+    } else if (!strcmp(pName, "delta:tracked-changes")) {
+
+        m_ctParagraphDeletedRevision = -1;
+        rAction.pushState("TrackedChanges");
         
     } else if (!strcmp(pName, "table:table-cell")) {
         UT_ASSERT(m_elementParsingLevel == 0);

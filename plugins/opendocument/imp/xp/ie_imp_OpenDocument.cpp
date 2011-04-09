@@ -58,11 +58,12 @@
  * Constructor
  */
 IE_Imp_OpenDocument::IE_Imp_OpenDocument (PD_Document * pDocument)
-  : IE_Imp (pDocument),
-    m_pGsfInfile (0),
-    m_sPassword (""),
-    m_pStreamListener(NULL),
-    m_pAbiData(NULL)
+  : IE_Imp (pDocument)
+  , m_pGsfInfile (0)
+  , m_sPassword ("")
+  , m_pStreamListener(NULL)
+  , m_pAbiData(NULL)
+  , m_pAbiChangeTrackingRevisionMapping(0)
 {
 }
 
@@ -80,10 +81,10 @@ IE_Imp_OpenDocument::~IE_Imp_OpenDocument ()
     DELETEP(m_pAbiData);
 } 
 
-bool IE_Imp_OpenDocument::pasteFromBuffer(PD_DocumentRange * pDocRange,
-				    const unsigned char * pData, 
-				    UT_uint32 lenData, 
-				    const char * szEncoding)
+bool IE_Imp_OpenDocument::pasteFromBuffer( PD_DocumentRange * pDocRange,
+                                           const unsigned char * pData, 
+                                           UT_uint32 lenData, 
+                                           const char * szEncoding)
 {
     UT_return_val_if_fail(getDoc() == pDocRange->m_pDoc,false);
     UT_return_val_if_fail(pDocRange->m_pos1 == pDocRange->m_pos2,false);
@@ -124,9 +125,10 @@ UT_Error IE_Imp_OpenDocument::_loadFile (GsfInput * oo_src)
         return UT_ERROR;
     }
 
-    m_pAbiData = new ODi_Abi_Data(getDoc(), m_pGsfInfile);    
-    m_pStreamListener = new ODi_StreamListener(getDoc(), m_pGsfInfile, &m_styles,
-                                              *m_pAbiData);
+    m_pAbiData = new ODi_Abi_Data(getDoc(), m_pGsfInfile);
+    m_pAbiChangeTrackingRevisionMapping = new ODi_Abi_ChangeTrackingRevisionMapping( getDoc(), m_pGsfInfile );
+    m_pStreamListener = new ODi_StreamListener( getDoc(), m_pGsfInfile, &m_styles,
+                                                *m_pAbiData, *m_pAbiChangeTrackingRevisionMapping );
     
     _setDocumentProperties();
           
@@ -232,9 +234,9 @@ UT_Error IE_Imp_OpenDocument::_handleManifestStream() {
     m_sPassword = "";
 
 	GsfInput* pMetaInf = gsf_infile_child_by_name(m_pGsfInfile, "META-INF");
-    ODi_ManifestStream_ListenerState manifestListener(getDoc(),
-                                          *(m_pStreamListener->getElementStack()),
-                                           m_cryptoInfo);
+    ODi_ManifestStream_ListenerState manifestListener( getDoc(),
+                                                       *(m_pStreamListener->getElementStack()),
+                                                       m_cryptoInfo);
 
 	m_pStreamListener->setState(&manifestListener, false);
 

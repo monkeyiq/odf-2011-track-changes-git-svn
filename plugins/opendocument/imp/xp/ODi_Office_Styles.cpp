@@ -61,9 +61,9 @@ ODi_Office_Styles::~ODi_Office_Styles()
  * @return The address of the newly created ODi_Style_Style or NULL, if the
  *         specified style is not currently supported (like graphic styles).
  */
-ODi_Style_Style* ODi_Office_Styles::addStyle(const gchar** ppAtts,
-					     ODi_ElementStack& rElementStack,
-					     ODi_Abi_Data & rAbiData) 
+ODi_Style_Style* ODi_Office_Styles::addStyle( const gchar** ppAtts,
+                                              ODi_ElementStack& rElementStack,
+                                              ODi_Abi_Data & rAbiData) 
 {
 
     const gchar* pFamily;
@@ -75,7 +75,7 @@ ODi_Style_Style* ODi_Office_Styles::addStyle(const gchar** ppAtts,
     UT_UTF8String replacementDisplayName;
     
     pFamily = UT_getAttribute("style:family", ppAtts);
-    pName = UT_getAttribute("style:name", ppAtts);
+    pName   = UT_getAttribute("style:name", ppAtts);
     pDisplayName = UT_getAttribute("style:display-name", ppAtts);
     UT_ASSERT(pName);
 
@@ -83,59 +83,74 @@ ODi_Style_Style* ODi_Office_Styles::addStyle(const gchar** ppAtts,
 
     UT_DEBUGMSG(("XXX addStyle() name:%s family:%s\n", pName, pFamily ));
     
-    if(!strcmp(pFamily, "text")) {
+    if(!strcmp(pFamily, "text"))
+    {
         // AbiWord doesn't support two styles with the same name, differing only
         // on its type (eg: A "Example" character style and a "Example"
         // paragraph style).
 
         // Do I already have a paragraph style with this name?
         pConstStyle = m_paragraphStyleStyles.getStyle(pName, true);
-        if (pConstStyle) {
+        if (pConstStyle)
+        {
             replacementName = pName;
             replacementName += "_text";
             
-            if (pDisplayName) {
+            if (pDisplayName)
+            {
+                UT_DEBUGMSG(("XXX addStyle() have pDisplayName\n" ));
+                UT_DEBUGMSG(("XXX addStyle() pDisplayName:%s\n", pDisplayName ));
                 replacementDisplayName = pDisplayName;
                 replacementDisplayName += "_text";
             }
 
-            UT_DEBUGMSG(("XXX addStyle() replacementName:%s\n", replacementName ));
+            UT_DEBUGMSG(("XXX addStyle() pName:%s replacementName:%s\n", pName, replacementName.utf8_str() ));
             
-            pStyle = m_textStyleStyles.addStyle(ppAtts, rElementStack,
-						rAbiData,
-                                                &replacementName,
-                                                &replacementDisplayName);
-        } else {
+            pStyle = m_textStyleStyles.addStyle( ppAtts, rElementStack,
+                                                 rAbiData,
+                                                 &replacementName,
+                                                 &replacementDisplayName );
+        }
+        else
+        {
             UT_DEBUGMSG(("XXX addStyle(else) this:%x\n", (void*)this ));
-	  pStyle = m_textStyleStyles.addStyle(ppAtts, rElementStack,rAbiData);
+            pStyle = m_textStyleStyles.addStyle( ppAtts, rElementStack, rAbiData );
         }
         
-    } else if(!strcmp(pFamily, "paragraph")) {
+    }
+    else if(!strcmp(pFamily, "paragraph"))
+    {
         // AbiWord doesn't support two styles with the same name, differing only
         // on its type (eg: A "Example" character style and a "Example"
         // paragraph style).
 
         // Do I already have a text style with this name?
         pConstStyle = m_textStyleStyles.getStyle(pName, true);
-        if (pConstStyle) {
+        if (pConstStyle)
+        {
             replacementName = pName;
             replacementName += "_paragraph";
             
-            if (pDisplayName) {
+            if (pDisplayName)
+            {
                 replacementDisplayName = pDisplayName;
                 replacementDisplayName += "_paragraph";
             }
             
-            pStyle = m_paragraphStyleStyles.addStyle(ppAtts, 
-						     rElementStack,
-						     rAbiData,
-                                                     &replacementName,
-                                                     &replacementDisplayName);
-        } else {
-	  pStyle = m_paragraphStyleStyles.addStyle(ppAtts, rElementStack,rAbiData);
+            pStyle = m_paragraphStyleStyles.addStyle( ppAtts, 
+                                                      rElementStack,
+                                                      rAbiData,
+                                                      &replacementName,
+                                                      &replacementDisplayName);
+        }
+        else
+        {
+            pStyle = m_paragraphStyleStyles.addStyle(ppAtts, rElementStack,rAbiData);
         }
         
-    } else if(!strcmp(pFamily, "section")) {
+    }
+    else if(!strcmp(pFamily, "section"))
+    {
       pStyle = m_sectionStyleStyles.addStyle(ppAtts, rElementStack,rAbiData);
         
     } else if(!strcmp(pFamily, "graphic")) {

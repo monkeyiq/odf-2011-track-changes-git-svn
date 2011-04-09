@@ -74,6 +74,7 @@ public:
     
 private:
 
+    UT_UTF8String& _parsePageDimension( UT_UTF8String& ret, const gchar* v );
     void _parseHeaderFooterProperties(const gchar** ppAtts);
     void _parsePageLayoutProperties(const gchar** ppAtts);
     void _parseBackgroundImage(const gchar** ppAtts);

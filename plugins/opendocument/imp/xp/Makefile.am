@@ -12,6 +12,8 @@ libxp_la_SOURCES = \
 	ie_imp_OpenDocument_Sniffer.h \
 	ODi_Abi_Data.cpp \
 	ODi_Abi_Data.h \
+	ODi_Abi_ChangeTrackingRevisionMapping.cpp \
+	ODi_Abi_ChangeTrackingRevisionMapping.h \
 	ODi_ContentStream_ListenerState.cpp \
 	ODi_ContentStream_ListenerState.h \
 	ODi_ElementStack.cpp \

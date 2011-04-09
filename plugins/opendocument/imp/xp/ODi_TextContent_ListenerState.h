@@ -44,6 +44,7 @@ class ODi_Office_Styles;
 class ODi_Style_List;
 class ODi_TableOfContent_ListenerState;
 class ODi_Abi_Data;
+class ODi_Abi_ChangeTrackingRevisionMapping;
 
 // AbiWord classes
 class PD_Document;
@@ -82,7 +83,8 @@ public:
         PD_Document* pDocument,
         ODi_Office_Styles* pStyles,
         ODi_ElementStack& rElementStack,
-	ODi_Abi_Data & rAbiData);
+        ODi_Abi_Data & rAbiData,
+        ODi_Abi_ChangeTrackingRevisionMapping* pAbiCTMap );
         
     virtual ~ODi_TextContent_ListenerState();
 
