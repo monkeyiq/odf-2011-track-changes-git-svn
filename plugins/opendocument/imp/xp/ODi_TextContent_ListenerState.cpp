@@ -828,6 +828,7 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                 m_pAbiDocument->appendFmt(&m_vecInlineFmt);
             }
 
+            UT_uint32 wid = 0;
             std::string ctMostRecentWritingVersion = ctAddRemoveStackGetLast( PP_REVISION_ADDITION );
             PP_RevisionAttr ctRevision;
             {
@@ -836,15 +837,28 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                              x, ctMostRecentWritingVersion.c_str() ));
                 if( !x )
                     x = ctMostRecentWritingVersion.c_str();
-                
+
+                wid = fromChangeID(x);
                 const gchar ** pAttrs = 0;
                 const gchar ** pProps = 0;
-                ctRevision.addRevision( fromChangeID(x),
+                ctRevision.addRevision( wid,
                                         PP_REVISION_ADDITION, pAttrs, pProps );
             }
+
+            std::string ctMostRecentDeleteVersion = ctAddRemoveStackGetLast( PP_REVISION_DELETION );
+            if( fromChangeID(ctMostRecentDeleteVersion) > wid )
+            {
+                const gchar ** pAttrs = 0;
+                const gchar ** pProps = 0;
+                ctRevision.addRevision( fromChangeID(ctMostRecentDeleteVersion),
+                                        PP_REVISION_DELETION, pAttrs, pProps );
+            }
             
+                
             if( strcmp( ctRevision.getXMLstring(), "0" ))
             {
+                UT_DEBUGMSG(("ODTCT start of text:span rev:%s\n", ctRevision.getXMLstring() ));
+                
                 const gchar* ppAtts[10];
                 bzero(ppAtts, 10 * sizeof(gchar*));
                 int i=0;
@@ -1664,6 +1678,8 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
             
                 if( strcmp( ctRevision.getXMLstring(), "0" ))
                 {
+                    UT_DEBUGMSG(("ODTCT end of text:span rev:%s\n", ctRevision.getXMLstring() ));
+                        
                     const gchar* ppAtts[10];
                     bzero(ppAtts, 10 * sizeof(gchar*));
                     int i=0;

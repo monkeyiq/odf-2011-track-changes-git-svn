@@ -340,6 +340,8 @@ bool ODe_DocumentData::writeContentXML(GsfOutfile* pOdt) {
     
     ODe_writeUTF8String(pContentStream, " <office:body>\n"
                                         "  <office:text>\n");
+    // FIXME: here OR the one above?
+    m_contentRevisions.write( pContentStream, m_pAbiDoc );
        
     ODe_gsf_output_write(pContentStream, gsf_output_size (m_pOfficeTextTemp),
 			 gsf_output_memory_get_bytes (GSF_OUTPUT_MEMORY (m_pOfficeTextTemp)));
