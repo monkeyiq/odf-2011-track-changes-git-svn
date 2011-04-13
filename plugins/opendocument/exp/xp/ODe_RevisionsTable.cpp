@@ -60,10 +60,10 @@ ODe_RevisionsTable::write( GsfOutput* pODT, PD_Document* pAbiDoc ) const
 
     std::stringstream ss;
     ss << " <delta:tracked-changes "
-       << " delta:showing-revisions=\"" << pAbiDoc->isShowRevisions() << "\" "
-       << " delta:mark-revisions=\""    << pAbiDoc->isMarkRevisions() << "\" "
-       << " delta:current-revision=\""  << pAbiDoc->getShowRevisionId() << "\" "
-       << " delta:auto-revisioning=\""  << pAbiDoc->isAutoRevisioning() << "\" "
+       // << " delta:showing-revisions=\"" << pAbiDoc->isShowRevisions() << "\" "
+       // << " delta:mark-revisions=\""    << pAbiDoc->isMarkRevisions() << "\" "
+       // << " delta:current-revision=\""  << pAbiDoc->getShowRevisionId() << "\" "
+       // << " delta:auto-revisioning=\""  << pAbiDoc->isAutoRevisioning() << "\" "
        << " >" << endl;
          
 	for (UT_sint32 k=0; k < vRevisions.getItemCount(); k++)

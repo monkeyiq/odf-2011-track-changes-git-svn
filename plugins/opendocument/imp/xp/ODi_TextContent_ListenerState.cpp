@@ -270,6 +270,11 @@ ODi_TextContent_ListenerState::ODi_TextContent_ListenerState (
     UT_ASSERT_HARMLESS(m_pStyles);
 
     setChangeTrackingRevisionMapping( pAbiCTMap );
+
+    spanStyle z;
+    z.m_attr = "props";
+    z.m_prop = "font-weight:normal;text-decoration:none;font-style:normal";
+    m_ctSpanStack.push_back( std::make_pair( PP_REVISION_ADDITION, z ) );
 }
 
 
@@ -814,6 +819,7 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
     }
     else if (!strcmp(pName, "text:span"))
     {
+        // open a span
 
         // Write all text that is between the last element tag and this
         // <text:span>
@@ -876,17 +882,22 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
         const gchar* pStyleName = UT_getAttribute("text:style-name", ppAtts);
         const ODi_Style_Style* pStyle;
         
-        if (!pStyleName) {
+        if (!pStyleName)
+        {
             // I haven't seen default styles for "text" family.
             UT_ASSERT_HARMLESS(UT_SHOULD_NOT_HAPPEN);
-            
-        } else {
+        }
+        else
+        {
             UT_DEBUGMSG(("ODTCT ctRevision.addRevision() pStyleName:%s\n", pStyleName ));
             
             pStyle = m_pStyles->getTextStyle(pStyleName, m_bOnContentStream);
             UT_DEBUGMSG(("ODTCT ctRevision.addRevision() pStyle:%x\n", pStyle ));
+
+            m_ctSpanStack.push_back( std::make_pair( PP_REVISION_ADDITION, spanStyle( pStyle )));
             
-            if (pStyle) {
+            if (pStyle)
+            {
 
                 UT_DEBUGMSG(("ODTCT ctRevision.addRevision(have pStyle!) pStyleName:%s auto:%d dn:%s\n",
                              pStyleName, pStyle->isAutomatic(), pStyle->getDisplayName().utf8_str() ));
@@ -895,14 +906,18 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                 bool ok;
                 UT_UTF8String props;
                 
-                if (pStyle->isAutomatic()) {
+                if (pStyle->isAutomatic())
+                {
                     pStyle->getAbiPropsAttrString(props);
                     
                     // It goes "hardcoded"
                     ppStyAttr[0] = "props";
                     ppStyAttr[1] = props.utf8_str();
+//                    ppStyAttr[1] = "font-weight:normal;text-decoration:none;font-style:normal";
                     ppStyAttr[2] = 0;
-                } else {
+                }
+                else
+                {
                     ppStyAttr[0] = "style";
                     ppStyAttr[1] = pStyle->getDisplayName().utf8_str();
                     ppStyAttr[2] = 0;                
@@ -917,7 +932,9 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
             }
         }
 
-    } else if (!strcmp(pName, "text:meta")) {
+    }
+    else if (!strcmp(pName, "text:meta"))
+    {
         
         _flush ();
 
@@ -1647,7 +1664,24 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
             _endParagraphElement(pName, rAction);
         }
         
-    } else if (!strcmp(pName, "text:span")) {
+    }
+    else if (!strcmp(pName, "text:span"))
+    {
+        // close a span
+        std::pair< PP_RevisionType, spanStyle > spanstyle = std::make_pair( PP_REVISION_NONE, spanStyle() );
+        if( !m_ctSpanStack.empty() )
+        {
+            // back() is the current style, we want to pop that style off and then see
+            // what the current "old" style was
+            m_ctSpanStack.pop_back();
+            if( !m_ctSpanStack.empty() )
+            {
+                spanstyle = m_ctSpanStack.back();
+                UT_DEBUGMSG(("ODTCT closing text:span() attr:%s spanStyle:%s\n",
+                             spanstyle.second.m_attr.c_str(), spanstyle.second.m_prop.c_str() ));
+            }
+
+        }
         
         _flush ();
 
@@ -1662,36 +1696,40 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
         m_pAbiDocument->appendFmt(&m_vecInlineFmt);
 
 
+        PP_RevisionAttr ctRevision;
+        const gchar*  ppAtts[20];
+        const gchar** ppAttsTop = ppAtts;
+        bzero(ppAtts, 20 * sizeof(gchar*));
+        
         m_ctSpanDepth--;
         if( !m_ctSpanDepth )
         {
-            {
-                PP_RevisionAttr ctRevision;
-                ctAddRemoveStackSetup( ctRevision, m_ctAddRemoveStack );
-                // {
-                //     UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", m_ctMostRecentWritingVersion.c_str() ));
-                //     const gchar ** pAttrs = 0;
-                //     const gchar ** pProps = 0;
-                //     ctRevision.addRevision( fromChangeID(m_ctMostRecentWritingVersion),
-                //                             PP_REVISION_ADDITION, pAttrs, pProps );
-                // }
-            
-                if( strcmp( ctRevision.getXMLstring(), "0" ))
-                {
-                    UT_DEBUGMSG(("ODTCT end of text:span rev:%s\n", ctRevision.getXMLstring() ));
+            ctAddRemoveStackSetup( ctRevision, m_ctAddRemoveStack );
+        }
+        if( spanstyle.first != PP_REVISION_NONE )
+        {
+            spanStyle& z = spanstyle.second;
+            ppAttsTop = z.set( ppAtts );
+            UT_DEBUGMSG(("ODTCT closing text:span(2) attr:%s spanStyle:%s\n",
+                         spanstyle.second.m_attr.c_str(), spanstyle.second.m_prop.c_str() ));
+        }
+        
+        if( ppAttsTop != ppAtts || strcmp( ctRevision.getXMLstring(), "0" ))
+        {
+            UT_DEBUGMSG(("ODTCT end of text:span rev:%s\n", ctRevision.getXMLstring() ));
                         
-                    const gchar* ppAtts[10];
-                    bzero(ppAtts, 10 * sizeof(gchar*));
-                    int i=0;
-                    ppAtts[i++] = PT_REVISION_ATTRIBUTE_NAME;
-                    ppAtts[i++] = ctRevision.getXMLstring();
-                    ppAtts[i++] = 0;
-                    _pushInlineFmt(ppAtts);
-                    bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
-                    UT_ASSERT(ok);
-                    m_ctHaveParagraphFmt = true;
-                }
-            }
+            int i=0;
+            ppAttsTop[i++] = PT_REVISION_ATTRIBUTE_NAME;
+            ppAttsTop[i++] = ctRevision.getXMLstring();
+            ppAttsTop[i++] = 0;
+            _pushInlineFmt(ppAtts);
+            bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
+            UT_ASSERT(ok);
+            m_ctHaveParagraphFmt = true;
+
+            _pushInlineFmt(ppAtts);
+            m_pAbiDocument->appendFmt(&m_vecInlineFmt);
+            
         }
         
     } else if (!strcmp(pName, "text:meta")) {
@@ -3405,5 +3443,43 @@ ODi_TextContent_ListenerState::ctGetACChange( const gchar** ppAtts )
     PP_RevisionAttr ret;
     ctAddACChange( ret, ppAtts );
     return ret;
+}
+
+
+ODi_TextContent_ListenerState::spanStyle::spanStyle( const ODi_Style_Style* pStyle )
+{
+    if (pStyle)
+    {
+
+        UT_DEBUGMSG(("ODTCT spanStyle() auto:%d dn:%s\n",
+                     pStyle->isAutomatic(), pStyle->getDisplayName().utf8_str() ));
+
+        bool ok;
+        UT_UTF8String props;
+        
+        if (pStyle->isAutomatic())
+        {
+            pStyle->getAbiPropsAttrString(props);
+            
+            // It goes "hardcoded"
+            m_attr = "props";
+            m_prop = props.utf8_str();
+        }
+        else
+        {
+            m_attr = "style";
+            m_prop = pStyle->getDisplayName().utf8_str();
+        }
+    }
+    
+}
+
+const gchar**
+ODi_TextContent_ListenerState::spanStyle::set( const gchar** ppAtts )
+{
+    ppAtts[0] = m_attr.c_str();
+    ppAtts[1] = m_prop.c_str();
+    ppAtts[2] = 0;
+    return &ppAtts[2];
 }
 

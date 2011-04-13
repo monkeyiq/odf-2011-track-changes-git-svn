@@ -45,6 +45,7 @@ class ODi_Style_List;
 class ODi_TableOfContent_ListenerState;
 class ODi_Abi_Data;
 class ODi_Abi_ChangeTrackingRevisionMapping;
+class ODi_Style_Style;
 
 // AbiWord classes
 class PD_Document;
@@ -242,6 +243,15 @@ private:
     m_ctAddRemoveStack_t m_ctAddRemoveStack;
     PP_RevisionAttr& ctAddRemoveStackSetup( PP_RevisionAttr& ra, m_ctAddRemoveStack_t& stack );
     std::string ctAddRemoveStackGetLast( PP_RevisionType t );
+    struct spanStyle 
+    {
+        std::string m_attr;
+        std::string m_prop;
+        spanStyle( const ODi_Style_Style* pStyle = 0 );
+        const gchar** set( const gchar** ppAtts );
+    };
+    typedef std::list< std::pair< PP_RevisionType, spanStyle > > m_ctSpanStack_t;
+    m_ctSpanStack_t m_ctSpanStack;
     
     //
     // stack of idrefs for delta:remove-leaving-content-start

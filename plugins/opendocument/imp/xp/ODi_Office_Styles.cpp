@@ -375,9 +375,9 @@ void ODi_Office_Styles::_fixStyles() {
  * 
  * @param pStyleName The name of the style wanted.
  */
-const ODi_Style_Style* ODi_Office_Styles::getParagraphStyle(
-                                             const gchar* pStyleName,
-                                             bool bOnContentStream) const
+const ODi_Style_Style*
+ODi_Office_Styles::getParagraphStyle( const gchar* pStyleName,
+                                      bool bOnContentStream) const
 {
     return m_paragraphStyleStyles.getStyle(pStyleName, bOnContentStream);
 }
@@ -386,11 +386,11 @@ const ODi_Style_Style* ODi_Office_Styles::getParagraphStyle(
 /**
  * 
  */
-const ODi_Style_Style* ODi_Office_Styles::getTextStyle(const gchar* pStyleName,
-                                              bool bOnContentStream) const
+const ODi_Style_Style*
+ODi_Office_Styles::getTextStyle( const gchar* pStyleName,
+                                 bool bOnContentStream ) const
 {
     UT_DEBUGMSG(("XXX getTextStyle() this:%x %s\n", (void*)this, pStyleName ));
-    
     return m_textStyleStyles.getStyle(pStyleName, bOnContentStream);
 }
     
@@ -398,8 +398,9 @@ const ODi_Style_Style* ODi_Office_Styles::getTextStyle(const gchar* pStyleName,
 /**
  * 
  */ 
-const ODi_Style_Style* ODi_Office_Styles::getSectionStyle(const gchar* pStyleName,
-                                                 bool bOnContentStream) const
+const ODi_Style_Style*
+ODi_Office_Styles::getSectionStyle( const gchar* pStyleName,
+                                    bool bOnContentStream ) const
 {
     return m_sectionStyleStyles.getStyle(pStyleName, bOnContentStream);
 }
@@ -408,8 +409,9 @@ const ODi_Style_Style* ODi_Office_Styles::getSectionStyle(const gchar* pStyleNam
 /**
  * 
  */
-const ODi_Style_Style* ODi_Office_Styles::getGraphicStyle(const gchar* pStyleName,
-                                          bool bOnContentStream) const
+const ODi_Style_Style*
+ODi_Office_Styles::getGraphicStyle( const gchar* pStyleName,
+                                    bool bOnContentStream ) const
 {
     return m_graphicStyleStyles.getStyle(pStyleName, bOnContentStream);
 }
@@ -418,8 +420,8 @@ const ODi_Style_Style* ODi_Office_Styles::getGraphicStyle(const gchar* pStyleNam
 /**
  * 
  */
-const ODi_Style_Style* ODi_Office_Styles::getTableStyle(const gchar* pStyleName,
-                                                  bool bOnContentStream) const
+const ODi_Style_Style* ODi_Office_Styles::getTableStyle( const gchar* pStyleName,
+                                                         bool bOnContentStream ) const
 {
     return m_tableStyleStyles.getStyle(pStyleName, bOnContentStream);
 }

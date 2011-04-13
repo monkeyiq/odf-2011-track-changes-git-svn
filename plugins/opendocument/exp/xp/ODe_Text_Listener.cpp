@@ -64,29 +64,31 @@ ODe_Text_Listener::ODe_Text_Listener(ODe_Styles& rStyles,
                                      GsfOutput* pTextOutput,
                                      ODe_AuxiliaryData& rAuxiliaryData,
                                      UT_uint8 zIndex,
-                                     UT_uint8 spacesOffset) :
-                        ODe_AbiDocListenerImpl(spacesOffset),
-                        m_openedODParagraph(false),
-                        m_openedODSpan(false),
-                        m_isFirstCharOnParagraph(true),
-                        m_openedODTextboxFrame(false),
-                        m_openedODNote(false),
-                        m_bIgoreFirstTab(false),
-                        m_pParagraphContent(NULL),
-                        m_currentListLevel(0),
-                        m_pCurrentListStyle(NULL),
-                        m_pendingColumnBrake(false),
-                        m_pendingPageBrake(false),
-                        m_pendingMasterPageStyleChange(false),
-                        m_rStyles(rStyles),
-                        m_rAutomatiStyles(rAutomatiStyles),
-                        m_pTextOutput(pTextOutput),
-                        m_rAuxiliaryData(rAuxiliaryData),
-                        m_zIndex(zIndex),
-                        m_iCurrentTOC(0),
-                        m_ctpParagraphAdditionalSpacesOffset(0),
-                        m_ctDeltaMerge(0),
-                        m_ctDeltaMergeJustStarted(false)
+                                     UT_uint8 spacesOffset
+    )
+    : ODe_AbiDocListenerImpl(spacesOffset)
+    , m_openedODParagraph(false)
+    , m_openedODSpan(false)
+    , m_isFirstCharOnParagraph(true)
+    , m_openedODTextboxFrame(false)
+    , m_openedODNote(false)
+    , m_bIgoreFirstTab(false)
+    , m_pParagraphContent(NULL)
+    , m_currentListLevel(0)
+    , m_pCurrentListStyle(NULL)
+    , m_pendingColumnBrake(false)
+    , m_pendingPageBrake(false)
+    , m_pendingMasterPageStyleChange(false)
+    , m_rStyles(rStyles)
+    , m_rAutomatiStyles(rAutomatiStyles)
+    , m_pTextOutput(pTextOutput)
+    , m_rAuxiliaryData(rAuxiliaryData)
+    , m_zIndex(zIndex)
+    , m_iCurrentTOC(0)
+    , m_ctpParagraphAdditionalSpacesOffset(0)
+    , m_ctDeltaMerge(0)
+    , m_ctDeltaMergeJustStarted(false)
+    , m_useChangeTracking( true )
 {
 }
 
@@ -103,30 +105,32 @@ ODe_Text_Listener::ODe_Text_Listener(ODe_Styles& rStyles,
                              ODe_AuxiliaryData& rAuxiliaryData,
                              UT_uint8 zIndex,
                              UT_uint8 spacesOffset,
-                             const UT_UTF8String& rPendingMasterPageStyleName) :
-                        ODe_AbiDocListenerImpl(spacesOffset),
-                        m_openedODParagraph(false),
-                        m_openedODSpan(false),
-                        m_isFirstCharOnParagraph(true),
-                        m_openedODTextboxFrame(false),
-                        m_openedODNote(false),
-			m_bIgoreFirstTab(false),
-                        m_pParagraphContent(NULL),
-                        m_currentListLevel(0),
-                        m_pCurrentListStyle(NULL),
-                        m_pendingColumnBrake(false),
-                        m_pendingPageBrake(false),
-                        m_pendingMasterPageStyleChange(true),
-                        m_masterPageStyleName(rPendingMasterPageStyleName),
-                        m_rStyles(rStyles),
-                        m_rAutomatiStyles(rAutomatiStyles),
-                        m_pTextOutput(pTextOutput),
-                        m_rAuxiliaryData(rAuxiliaryData),
-                        m_zIndex(zIndex),
-                        m_iCurrentTOC(0),
-                        m_ctpParagraphAdditionalSpacesOffset(0),
-                        m_ctDeltaMerge(0),
-                        m_ctDeltaMergeJustStarted(false)
+                             const UT_UTF8String& rPendingMasterPageStyleName
+    )
+    : ODe_AbiDocListenerImpl(spacesOffset)
+    , m_openedODParagraph(false)
+    , m_openedODSpan(false)
+    , m_isFirstCharOnParagraph(true)
+    , m_openedODTextboxFrame(false)
+    , m_openedODNote(false)
+    , m_bIgoreFirstTab(false)
+    , m_pParagraphContent(NULL)
+    , m_currentListLevel(0)
+    , m_pCurrentListStyle(NULL)
+    , m_pendingColumnBrake(false)
+    , m_pendingPageBrake(false)
+    , m_pendingMasterPageStyleChange(true)
+    , m_masterPageStyleName(rPendingMasterPageStyleName)
+    , m_rStyles(rStyles)
+    , m_rAutomatiStyles(rAutomatiStyles)
+    , m_pTextOutput(pTextOutput)
+    , m_rAuxiliaryData(rAuxiliaryData)
+    , m_zIndex(zIndex)
+    , m_iCurrentTOC(0)
+    , m_ctpParagraphAdditionalSpacesOffset(0)
+    , m_ctDeltaMerge(0)
+    , m_ctDeltaMergeJustStarted(false)
+    , m_useChangeTracking( true )
 {
 }
 
@@ -382,22 +386,87 @@ UT_uint32 getHighestRevisionNumberWithStyle( PP_RevisionAttr& ra )
 }
 
 
+void
+ODe_Text_Listener::openSpanForRevisionToBuffer( const PP_Revision* pAP,
+                                                std::stringstream& ss,
+                                                std::stringstream& postss )
+{
+    std::string styleName = ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles );
+    if (!styleName.empty())
+    {
+        UT_UTF8String output = "<text:span";
+        ODe_writeAttribute(output, "text:style-name", ODe_Style_Style::convertStyleToNCName(styleName) );
+
+        UT_uint32       styleRev = pAP->getId();
+        PP_RevisionType styleOp  = pAP->getType();
+        
+        if( styleRev )
+        {
+            ODe_writeAttribute(output, "delta:insertion-change-idref", styleRev );
+            std::string insertionType = "";
+            if( styleOp == PP_REVISION_ADDITION || PP_REVISION_FMT_CHANGE )
+            {
+                insertionType = "insert-around-content";
+            }
+            if( !insertionType.empty() )
+            {
+                ODe_writeAttribute(output, "delta:insertion-type", insertionType );
+            }
+        }
+        output += ">";
+
+        ss << output.utf8_str();
+        if( !ss.str().empty() )
+            postss << "</text:span>";
+    }
+}
+
+
+static std::stringstream&
+prepend( std::stringstream& ss, const std::stringstream& prefix )
+{
+    std::stringstream t;
+    t << prefix.str();
+    t << ss.str();
+    ss.rdbuf()->str("");
+    ss << t.str();
+    return ss;
+}
+
+
 /**
  * 
  */
 void
 ODe_Text_Listener::openSpan(const PP_AttrProp* pAP)
 {
-    UT_UTF8String styleName;
+    std::string styleName;
     bool ok;
     const gchar* pValue;
-    UT_uint32 styleRev = 0;
-
+    UT_uint32       styleRev = 0;
+    PP_RevisionType styleOp  = PP_REVISION_NONE;
+    
     UT_DEBUGMSG(("ODe_Text_Listener::openSpan()\n"));
 
+    if( !m_useChangeTracking )
+    {
+        styleName = ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles );
+        UT_DEBUGMSG(("ODe_Text_Listener::openSpan() styleName:%s\n", styleName.c_str() ));
+
+        if (!styleName.empty())
+        {
+            UT_UTF8String output;
+            UT_UTF8String_sprintf(output, "<text:span text:style-name=\"%s\">",
+                                  ODe_Style_Style::convertStyleToNCName(styleName).escapeXML().utf8_str());
+            ODe_writeUTF8String(m_pParagraphContent, output);
+            m_openedODSpan = true;
+        }
+    }
+    
+    
     pChangeTrackingParagraphData_t ctp = m_rAuxiliaryData.getChangeTrackingParagraphData( getCurrentDocumentPosition() );
     UT_DEBUGMSG(("CT openSpan() pos:%d have ctp pointer:%p\n",getCurrentDocumentPosition(),ctp));
-    m_ctpTextSpanEnclosingElementCloseStream.rdbuf()->str("");
+    std::stringstream ctpTextSpanEnclosingElementCloseStream;
     m_ctpSpanAdditionalSpacesOffset = 0;
     if( ctp )
     {
@@ -419,6 +488,8 @@ ODe_Text_Listener::openSpan(const PP_AttrProp* pAP)
             PP_RevisionAttr ra( pValue );
             bool forceVersionShell = false;
             styleRev = getHighestRevisionNumberWithStyle( ra );
+            styleOp  = ra.getType( styleRev );
+            UT_DEBUGMSG(("Text_Listener::openSpan() styleRev:%d\n", styleRev ));
             
             if( m_ctDeltaMerge && m_ctDeltaMerge->isDifferentRevision( ra ) )
             {
@@ -497,7 +568,7 @@ ODe_Text_Listener::openSpan(const PP_AttrProp* pAP)
                                << "\"" << idref << "\">"
                                << "";
                             ODe_writeUTF8String(m_pParagraphContent, ss.str().c_str());
-                            m_ctpTextSpanEnclosingElementCloseStream << "</delta:removed-content>";
+                            ctpTextSpanEnclosingElementCloseStream << "</delta:removed-content>";
                             UT_DEBUGMSG(("Text_Listener::openSpan() removed-content:%s\n", idref.c_str() ));
                         }
                     }
@@ -517,88 +588,34 @@ ODe_Text_Listener::openSpan(const PP_AttrProp* pAP)
                        << "";
                     ODe_writeUTF8String(m_pParagraphContent, ss.str().c_str());
             
-                    m_ctpTextSpanEnclosingElementCloseStream << "<delta:inserted-text-end delta:inserted-text-idref="
-                                                             << "\"" << itid << "\""
-                                                             << "/>";
+                    ctpTextSpanEnclosingElementCloseStream << "<delta:inserted-text-end delta:inserted-text-idref="
+                                                           << "\"" << itid << "\""
+                                                           << "/>";
                 }
             }
+
+            std::stringstream postambless;
+            const PP_Revision* r = 0;
+            for( int raIdx = 0;
+                 raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
+                 raIdx++ )
+            {
+                std::stringstream press;
+                std::stringstream postss;
+                
+                openSpanForRevisionToBuffer( r, press, postss );
+                ODe_writeUTF8String( m_pParagraphContent, press.str().c_str() );
+                postambless << postss.str();
+            }
+            UT_DEBUGMSG(("ODe_Text_Listener::openSpan() postambless:%s\n", postambless.str().c_str() ));
+            prepend( ctpTextSpanEnclosingElementCloseStream, postambless );
         }
     }
      
     UT_DEBUGMSG(("ODe_Text_Listener::openSpan() has rev:%d\n", pAP->getAttribute("revision", pValue) ));
     UT_DEBUGMSG(("ODe_Text_Listener::openSpan() has style-props:%d\n", ODe_Style_Style::hasTextStyleProps(pAP) ));
-    
-    if ( ODe_Style_Style::hasTextStyleProps(pAP) )
-    {
-        // Need to create a new automatic style to hold those paragraph
-        // properties.
-        
-        ODe_Style_Style* pStyle;
-        pStyle = new ODe_Style_Style();
-        pStyle->setFamily("text");
-        
-        pStyle->fetchAttributesFromAbiSpan(pAP);
-        
-        m_rAutomatiStyles.storeTextStyle(pStyle);
-        styleName = pStyle->getName();
-        
-    }
-    else
-    {
-        ok = pAP->getAttribute("style", pValue);
-        UT_DEBUGMSG(("ODe_Text_Listener::openSpan() no style-props, ok:%d\n", ok ));
-        if (ok)
-        {
-            styleName = pValue;
-        }
-    }
-
-    UT_DEBUGMSG(("ODe_Text_Listener::openSpan() styleName:%s\n", styleName.utf8_str() ));
-
-    
-    if (!styleName.empty())
-    {
-        UT_UTF8String output;
-        
-        UT_UTF8String_sprintf(output, "<text:span text:style-name=\"%s\"",
-                              ODe_Style_Style::convertStyleToNCName(styleName).escapeXML().utf8_str());
-        if( styleRev )
-        {
-            output += " delta:insertion-change-idref=\"";
-            output += tostr(styleRev);
-            output += "\"";
-        }
-        output += ">";
-        
-        ODe_writeUTF8String(m_pParagraphContent, output);
-        m_openedODSpan = true;
-    }
-
-
-   
-
-    {
-        
-//        UT_UTF8String output;
-        
-        // const gchar* pValue;
-        // bool ok = pAP->getAttribute("revision", pValue);
-        // output += " <change-record ";
-        // output += " delta:revisionok=\"";
-        // output += ( ok ? "yes" : "no");
-        // output += "\"";
-        // if(ok)
-        // {
-        //     output += " delta:revision=\"";
-        //     output += pValue;
-        //     output += "\"";
-        // }
-
-//        output += " >\n";
-//        ODe_writeUTF8String(m_pParagraphContent, output);
-    }
-    
-    
+    UT_DEBUGMSG(("openSpan() adding close to stack of:%s\n", ctpTextSpanEnclosingElementCloseStream.str().c_str() ));
+    m_ctpTextSpanEnclosingElementCloseStreamStack.push_back( ctpTextSpanEnclosingElementCloseStream.str() );
 }
 
 
@@ -607,18 +624,30 @@ ODe_Text_Listener::openSpan(const PP_AttrProp* pAP)
  */
 void ODe_Text_Listener::closeSpan()
 {
-    if (m_openedODSpan)
+    if( !m_useChangeTracking )
     {
-        ODe_writeUTF8String(m_pParagraphContent, "</text:span>");
-        m_openedODSpan = false;
+        if (m_openedODSpan)
+        {
+            ODe_writeUTF8String(m_pParagraphContent, "</text:span>");
+            m_openedODSpan = false;
+        }
     }
+    else
+    {
+        if( !m_ctpTextSpanEnclosingElementCloseStreamStack.empty() )
+        {
+            std::string s = m_ctpTextSpanEnclosingElementCloseStreamStack.back();
+            m_ctpTextSpanEnclosingElementCloseStreamStack.pop_back();
+            
+            UT_DEBUGMSG(("closeSpan() s:%s\n", s.c_str() ));
 
-    if(!m_ctpTextSpanEnclosingElementCloseStream.str().empty())
-    {
-        ODe_writeUTF8String(m_pParagraphContent, m_ctpTextSpanEnclosingElementCloseStream.str().c_str() );
+            if(!s.empty())
+            {
+//              ODe_writeUTF8String( m_pParagraphContent, "<!-- ODe_Text_Listener::closeSpan() postamble... -->" );
+                ODe_writeUTF8String( m_pParagraphContent, s.c_str() );
+            }
+        }
     }
-    
-    
 }
 
 

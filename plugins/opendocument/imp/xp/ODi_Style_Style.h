@@ -42,6 +42,8 @@ class PD_Document;
  */
 class ODi_Style_Style : public ODi_ListenerState {
 
+    void addDecoration( const char* s );
+    
 public:
 
     // Used to specify whether a given cell has a border (top, left, etc).

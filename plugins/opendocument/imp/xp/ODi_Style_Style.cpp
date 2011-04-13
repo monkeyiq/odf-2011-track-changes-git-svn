@@ -70,6 +70,7 @@ void ODi_Style_Style::startElement(const gchar* pName,
                                   const gchar** ppAtts,
 								   ODi_ListenerStateAction& /*rAction*/) 
 {
+    UT_DEBUGMSG(( "Style::startElement()\n" ));
 
     if (!strcmp("style:style", pName)) {
         
@@ -95,7 +96,10 @@ void ODi_Style_Style::startElement(const gchar* pName,
         }
         
     } else if (!strcmp("style:text-properties", pName)) {
-        
+
+        m_fontWeight = "normal";
+        m_textDecoration = "none";
+        m_fontStyle = "normal";
         _parse_style_textProperties(ppAtts);
         
     } else if (!strcmp("style:section-properties", pName)) {
@@ -560,6 +564,18 @@ void ODi_Style_Style::_parse_style_tabStopProperties(const gchar** ppProps) {
 
 
 
+void
+ODi_Style_Style::addDecoration( const char* s )
+{
+    if( m_textDecoration == "none" )
+        m_textDecoration = "";
+
+    if(!m_textDecoration.empty())
+        m_textDecoration += " "; //separate the props with a space, not a comma
+    
+    m_textDecoration += (std::string)s;
+}
+
 
 
 /**
@@ -579,33 +595,27 @@ void ODi_Style_Style::_parse_style_textProperties(const gchar** ppProps) {
     const gchar* undrType = UT_getAttribute("style:text-underline-type", ppProps);
 
     if ((undrStyle && (strcmp(undrStyle, "none") != 0)) ||
-        (undrType && (strcmp(undrType, "none") != 0))) {
-
-        m_textDecoration += "underline";
+        (undrType && (strcmp(undrType, "none") != 0)))
+    {
+        addDecoration( "underline" );
     }
 
     const gchar* ovrStyle = UT_getAttribute("style:text-overline-style", ppProps);
     const gchar* ovrType = UT_getAttribute("style:text-overline-type", ppProps);
 
     if ((ovrStyle && (strcmp(ovrStyle, "none") != 0)) ||
-        (ovrType && (strcmp(ovrType, "none") != 0))) {
-
-        if(!m_textDecoration.empty())
-            m_textDecoration += " "; //separate the props with a space, not a comma
-
-        m_textDecoration += "overline";
+        (ovrType && (strcmp(ovrType, "none") != 0)))
+    {
+        addDecoration( "overline" );
     }
 
     const gchar* strkStyle = UT_getAttribute("style:text-line-through-style", ppProps);
     const gchar* strkType = UT_getAttribute("style:text-line-through-type", ppProps);
 
     if ((strkStyle && (strcmp(strkStyle, "none") != 0)) ||
-        (strkType && (strcmp(strkType, "none") != 0))) {
-
-        if(!m_textDecoration.empty())
-            m_textDecoration += " "; //separate the props with a space, not a comma
-
-        m_textDecoration += "line-through";
+        (strkType && (strcmp(strkType, "none") != 0)))
+    {
+        addDecoration( "line-through" );
     }
 
     pVal = UT_getAttribute("style:text-position", ppProps);

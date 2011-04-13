@@ -31,6 +31,7 @@
 #include <ut_debugmsg.h>
 #include <ut_assert.h>
 #include <ut_string_class.h>
+#include <ut_conversion.h>
 
 // External includes
 #include <gsf/gsf-output-stdio.h>
@@ -124,6 +125,20 @@ void ODe_writeAttribute(UT_UTF8String& rOutput,
         rOutput += pValue;
         rOutput += "\"";
     }
+}
+
+void ODe_writeAttribute(UT_UTF8String& rOutput,
+                        const gchar* pName,
+                        std::string& rValue)
+{
+    ODe_writeAttribute( rOutput, pName, rValue.c_str() );
+}
+
+void ODe_writeAttribute(UT_UTF8String& rOutput,
+                        const gchar* pName,
+                        UT_uint32 v )
+{
+    ODe_writeAttribute( rOutput, pName, tostr(v).c_str() );
 }
 
 

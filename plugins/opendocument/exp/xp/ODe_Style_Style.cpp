@@ -27,6 +27,7 @@
 
 // Internal includes
 #include "ODe_Common.h"
+#include "ODe_AutomaticStyles.h"
 
 // AbiWord includes
 #include <pp_AttrProp.h>
@@ -164,6 +165,45 @@ bool ODe_Style_Style::write(GsfOutput* pODT, const UT_UTF8String& rSpacesOffset)
     ODe_writeUTF8String(pODT, output);
     return true;
 }
+
+
+std::string
+ODe_Style_Style::getTextStyleProps( const PP_AttrProp* pAP,
+                                    ODe_AutomaticStyles& m_rAutomatiStyles )
+{
+    std::string ret;
+
+    if ( ODe_Style_Style::hasTextStyleProps(pAP) )
+    {
+        // Need to create a new automatic style to hold those paragraph
+        // properties.
+        
+        ODe_Style_Style* pStyle;
+        pStyle = new ODe_Style_Style();
+        pStyle->setFamily("text");
+        
+        pStyle->fetchAttributesFromAbiSpan(pAP);
+        
+        m_rAutomatiStyles.storeTextStyle(pStyle);
+        ret = pStyle->getName().utf8_str();
+    }
+    else
+    {
+        bool ok;
+        const gchar* pValue;
+        
+        ok = pAP->getAttribute("style", pValue);
+        UT_DEBUGMSG(("ODe_Text_Listener::openSpan() no style-props, ok:%d\n", ok ));
+        if (ok)
+        {
+            ret = pValue;
+        }
+    }
+    
+    return ret;
+    
+}
+
 
 
 /**
@@ -984,6 +1024,14 @@ void ODe_Style_Style::setDefaultTabInterval(const UT_UTF8String& rDefaultTabInte
     }
     m_pParagraphProps->m_defaultTabInterval = rDefaultTabInterval;
 }
+
+UT_UTF8String
+ODe_Style_Style::convertStyleToNCName(std::string& name)
+{
+    UT_UTF8String t = name.c_str();
+    return convertStyleToNCName( t );
+}
+
 
 /**
  * 

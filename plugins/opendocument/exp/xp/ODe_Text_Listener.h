@@ -143,6 +143,7 @@ private:
     bool m_openedODTextboxFrame;
     bool m_openedODNote;
     bool m_bIgoreFirstTab;
+    bool m_useChangeTracking;
 
     // Content of the current paragraph.
     GsfOutput* m_pParagraphContent;
@@ -174,11 +175,14 @@ private:
     std::stringstream m_ctpTextPBeforeClosingElementStream;  //< output before </text:p> is written
     std::stringstream m_ctpTextPEnclosingElementCloseStream; //< output after  </text:p> is written
     int m_ctpParagraphAdditionalSpacesOffset;                //< adjust m_spacesOffset during close of text:p
-    std::stringstream m_ctpTextSpanEnclosingElementCloseStream; //< output after </text:span> is written
+    std::list< std::string > m_ctpTextSpanEnclosingElementCloseStreamStack; //< output after </text:span> is written
     int m_ctpSpanAdditionalSpacesOffset;                        //< adjust m_spacesOffset during close of text:span
     ODe_ChangeTrackingDeltaMerge* m_ctDeltaMerge;               //< if != 0 then we are inside a delta:merge element
     bool m_ctDeltaMergeJustStarted;                             //< if we start a DM then close XML element tags are ommitted.
     void ctDeltaMerge_cleanup();
+
+    void openSpanForRevisionToBuffer( const PP_Revision* pAP, std::stringstream& ss, std::stringstream& postss );
+
     
     /**
      * Gather all of the attrName attributes from the revisions of

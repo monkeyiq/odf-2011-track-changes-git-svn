@@ -36,6 +36,7 @@
 // AbiWord classes
 class PP_AttrProp;
 class ODe_Style_List;
+class ODe_AutomaticStyles;
 
 /**
  * Class representing an OpenDocument <style:style> element.
@@ -53,6 +54,7 @@ public:
     static bool hasParagraphStyleProps(const PP_AttrProp* pAP);
     static bool hasSectionInfo(const PP_AttrProp* pAP);
     static bool hasTableStyleProps(const PP_AttrProp* pAP);    
+    static std::string getTextStyleProps(const PP_AttrProp* pAP, ODe_AutomaticStyles& m_rAutomatiStyles );
 
     // It does not take style names into consideration.
     // Read it like: "is style "T1" equivalent to style "T2"
@@ -135,6 +137,7 @@ public:
     void setDefaultTabInterval(const UT_UTF8String& rDefaultTabInterval);
     
     static UT_UTF8String convertStyleToNCName(const UT_UTF8String& name);
+    static UT_UTF8String convertStyleToNCName(std::string& name);
     
 private:
 

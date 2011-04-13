@@ -28,6 +28,7 @@
 
 // AbiWord includes
 #include <ut_types.h>
+#include <string>
 
 // External includes
 #include <gsf/gsf-output.h>
@@ -53,6 +54,14 @@ void ODe_writeAttribute(UT_UTF8String& rOutput,
 void ODe_writeAttribute(UT_UTF8String& rOutput,
                         const gchar* pName,
                         const gchar* pValue);
+
+void ODe_writeAttribute(UT_UTF8String& rOutput,
+                        const gchar* pName,
+                        std::string& rValue);
+
+void ODe_writeAttribute(UT_UTF8String& rOutput,
+                        const gchar* pName,
+                        UT_uint32 v );
 
 // The source file is rewinded before writing its contents into the destination
 // and after that it's left on its EOF state.
