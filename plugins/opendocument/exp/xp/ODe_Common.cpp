@@ -94,6 +94,12 @@ void ODe_writeUTF8String (GsfOutput * output, const UT_UTF8String & str)
     ODe_gsf_output_write (output, str.byteLength(), reinterpret_cast<const guint8*>(str.utf8_str()));
 }
 
+void ODe_writeString (GsfOutput* output, const std::string& str)
+{
+    ODe_gsf_output_write (output, str.length(), reinterpret_cast<const guint8*>(str.c_str()));
+}
+
+
 
 /**
  * 

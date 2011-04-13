@@ -245,12 +245,14 @@ private:
     std::string ctAddRemoveStackGetLast( PP_RevisionType t );
     struct spanStyle 
     {
-        std::string m_attr;
-        std::string m_prop;
-        spanStyle( const ODi_Style_Style* pStyle = 0 );
+        UT_uint32       m_rev;
+        PP_RevisionType m_type;
+        std::string     m_attr;
+        std::string     m_prop;
+        spanStyle( const ODi_Style_Style* pStyle = 0, UT_uint32 rev = 0, PP_RevisionType rt = PP_REVISION_NONE );
         const gchar** set( const gchar** ppAtts );
     };
-    typedef std::list< std::pair< PP_RevisionType, spanStyle > > m_ctSpanStack_t;
+    typedef std::list< spanStyle > m_ctSpanStack_t;
     m_ctSpanStack_t m_ctSpanStack;
     
     //

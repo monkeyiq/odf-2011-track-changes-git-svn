@@ -551,6 +551,9 @@ std::string ODe_AuxiliaryData::toChangeID( UT_uint32 v )
 
 ////////////////////////
 
+#include "ODe_Styles.h"
+#include "ODe_Style_List.h"
+#include "ODe_Style_Style.h"
 
 
 std::string
@@ -568,6 +571,29 @@ ChangeTrackingACChange::ChangeTrackingACChange()
 }
 
 
+void
+ChangeTrackingACChange::setAttributesToSave( const std::string& s )
+{
+    std::list< std::string > l;
+    l.push_back( s );
+    setAttributesToSave( l );
+}
+
+
+void
+ChangeTrackingACChange::setAttributesToSave( const std::list< std::string >& l )
+{
+    m_attributesToSave.clear();
+    m_attributesToSave = l;
+}
+
+const std::list< std::string >&
+ChangeTrackingACChange::getAttributesToSave()
+{
+    return m_attributesToSave;
+}
+
+
 
 std::string
 ChangeTrackingACChange::createACChange( UT_uint32 revision,
@@ -580,7 +606,7 @@ ChangeTrackingACChange::createACChange( UT_uint32 revision,
     ++m_changeID;
     
     // ac:changeXXX is revisionid,(insert,remove,modify CrUD),attribute,old-value
-    ss << "ac:change" << m_changeID << "=\""
+    ss << " ac:change" << m_changeID << "=\""
        << revision << ",";
     switch( actype )
     {
@@ -599,7 +625,7 @@ ChangeTrackingACChange::createACChange( UT_uint32 revision,
     }
     ss << attr << ",";
     ss << oldValue;
-    ss << "\" ";
+    ss << "\"";
     return ss.str();
 }
 
@@ -642,6 +668,126 @@ ChangeTrackingACChange::createACChange( const PP_AttrProp* pAPcontainingRevision
     return "";
 }
 
+void
+ChangeTrackingACChange::setAttributeLookupFunction( const std::string& n, m_attrRead_f f )
+{
+    m_attrlookups[n] = f;
+}
+
+void
+ChangeTrackingACChange::clearAttributeLookupFunctions()
+{
+    m_attrlookups.clear();
+}
+
+
+struct LookupODFStyleFunctor
+{
+    ODe_AutomaticStyles& m_rAutomatiStyles;
+    
+    LookupODFStyleFunctor( ODe_AutomaticStyles& as )
+        :
+        m_rAutomatiStyles( as )
+    {
+    }
+    
+    std::string operator()( const PP_Revision* pAP, std::string attr ) const
+    {
+        std::string styleName = ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles );
+        UT_DEBUGMSG(("LookupODFStyleFunctor(a) rev:%d stylename:%s\n", pAP->getId(), styleName.c_str() ));
+        if( !styleName.empty() )
+        {
+            UT_DEBUGMSG(("LookupODFStyleFunctor(b) rev:%d stylename:%s\n", pAP->getId(), styleName.c_str() ));
+        }
+        return styleName;
+    }
+};
+
+
+ChangeTrackingACChange::m_attrRead_f
+ChangeTrackingACChange::getLookupODFStyleFunctor( ODe_AutomaticStyles& as )
+{
+    LookupODFStyleFunctor ret( as );
+    return ret;
+}
+
+static std::string UTGetAttrFunctor( const PP_Revision* pAP, std::string attr )
+{
+    const char* v = UT_getAttribute( pAP, attr.c_str(), 0 );
+    std::string ret = v ? v : "";
+    return ret;
+}
+
+
+
+ChangeTrackingACChange::m_attrRead_f
+ChangeTrackingACChange::getUTGetAttrFunctor()
+{
+    return UTGetAttrFunctor;
+}
+
+
+
+
+std::string
+ChangeTrackingACChange::handleRevAttr( const PP_Revision* r,
+                                       std::map< std::string, const PP_Revision* >& attributesSeen,
+                                       m_attrRead_f f,
+                                       std::string attr,
+                                       const char* newValue )
+{
+    typedef std::map< std::string, const PP_Revision* > attributesSeen_t;
+
+    UT_DEBUGMSG(("ChangeTrackingACChange::handleRevAttr() r:%d attr:%s newV:%s\n", r->getId(), attr.c_str(), newValue ));
+    
+    ac_change_t actype = INVALID;
+    std::string oldValue = "";
+                
+    //
+    // If this is the first time we see this attribute then surely it is
+    // an INSERT
+    //
+    if( !attributesSeen.count(attr))
+    {
+        actype = INSERT;
+    }
+    else
+    {
+        //
+        // Grab the value of the attribute from the previous revision...
+        //
+        const PP_Revision* oldr = attributesSeen[ attr ];
+        oldValue = f( oldr, attr );
+        // if( const char* v = UT_getAttribute( oldr, attr.c_str(), 0 ))
+        // {
+        //     oldValue = v;
+        // }
+    }
+                
+    attributesSeen[ attr ] = r;
+
+    if( actype == INVALID )
+    {
+        switch( r->getType() )
+        {
+            case PP_REVISION_DELETION:
+                actype = REMOVE;
+                break;
+            case PP_REVISION_ADDITION:
+                actype = INSERT;
+                break;
+            case PP_REVISION_FMT_CHANGE:
+            case PP_REVISION_ADDITION_AND_FMT:
+                actype = MODIFY;
+                break;
+        }
+    }
+                
+    std::string str = createACChange( r->getId(), actype, attr, oldValue );
+    return str;
+}
+
+
 
 std::string
 ChangeTrackingACChange::createACChange( std::list< const PP_Revision* > revlist )
@@ -672,6 +818,19 @@ ChangeTrackingACChange::createACChange( std::list< const PP_Revision* > revlist 
          ri != revlist.end(); ++ri )
     {
         r = *ri;
+
+        for( m_attrlookups_t::iterator ai = m_attrlookups.begin(); ai != m_attrlookups.end(); ++ai )
+        {
+            std::string attr = ai->first;
+            std::string v = ai->second( r, attr );
+            if( !v.empty() )
+            {
+                std::string str = handleRevAttr( r, attributesSeen, ai->second, attr, v.c_str() );
+                ss << str;
+            }
+        }
+        
+
         
         for( m_attributesToSave_t::iterator ai = m_attributesToSave.begin();
              ai != m_attributesToSave.end(); ++ai )
@@ -679,50 +838,54 @@ ChangeTrackingACChange::createACChange( std::list< const PP_Revision* > revlist 
             std::string attr = ai->c_str();
             if( const char* newValue = UT_getAttribute( r, attr.c_str(), 0 ))
             {
-                ac_change_t actype = INVALID;
-                std::string oldValue = "";
-                
-                //
-                // If this is the first time we see this attribute then surely it is
-                // an INSERT
-                //
-                if( !attributesSeen.count(attr))
-                {
-                    actype = INSERT;
-                }
-                else
-                {
-                    //
-                    // Grab the value of the attribute from the previous revision...
-                    //
-                    const PP_Revision* oldr = attributesSeen[ attr ];
-                    if( const char* v = UT_getAttribute( oldr, attr.c_str(), 0 ))
-                    {
-                        oldValue = v;
-                    }
-                }
-                
-                attributesSeen[ attr ] = r;
-
-                if( actype == INVALID )
-                {
-                    switch( r->getType() )
-                    {
-                        case PP_REVISION_DELETION:
-                            actype = REMOVE;
-                            break;
-                        case PP_REVISION_ADDITION:
-                            actype = INSERT;
-                            break;
-                        case PP_REVISION_FMT_CHANGE:
-                        case PP_REVISION_ADDITION_AND_FMT:
-                            actype = MODIFY;
-                            break;
-                    }
-                }
-                
-                std::string str = createACChange( r->getId(), actype, attr, oldValue );
+                std::string str = handleRevAttr( r, attributesSeen, getUTGetAttrFunctor(), attr, newValue );
                 ss << str;
+
+                
+                // ac_change_t actype = INVALID;
+                // std::string oldValue = "";
+                
+                // //
+                // // If this is the first time we see this attribute then surely it is
+                // // an INSERT
+                // //
+                // if( !attributesSeen.count(attr))
+                // {
+                //     actype = INSERT;
+                // }
+                // else
+                // {
+                //     //
+                //     // Grab the value of the attribute from the previous revision...
+                //     //
+                //     const PP_Revision* oldr = attributesSeen[ attr ];
+                //     if( const char* v = UT_getAttribute( oldr, attr.c_str(), 0 ))
+                //     {
+                //         oldValue = v;
+                //     }
+                // }
+                
+                // attributesSeen[ attr ] = r;
+
+                // if( actype == INVALID )
+                // {
+                //     switch( r->getType() )
+                //     {
+                //         case PP_REVISION_DELETION:
+                //             actype = REMOVE;
+                //             break;
+                //         case PP_REVISION_ADDITION:
+                //             actype = INSERT;
+                //             break;
+                //         case PP_REVISION_FMT_CHANGE:
+                //         case PP_REVISION_ADDITION_AND_FMT:
+                //             actype = MODIFY;
+                //             break;
+                //     }
+                // }
+                
+                // std::string str = createACChange( r->getId(), actype, attr, oldValue );
+                // ss << str;
             }
         }
     }

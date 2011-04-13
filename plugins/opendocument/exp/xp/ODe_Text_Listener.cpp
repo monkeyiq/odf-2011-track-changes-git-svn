@@ -386,14 +386,16 @@ UT_uint32 getHighestRevisionNumberWithStyle( PP_RevisionAttr& ra )
 }
 
 
-void
+bool
 ODe_Text_Listener::openSpanForRevisionToBuffer( const PP_Revision* pAP,
                                                 std::stringstream& ss,
                                                 std::stringstream& postss )
 {
+    bool ret = false;
     std::string styleName = ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles );
     if (!styleName.empty())
     {
+        ret = true;
         UT_UTF8String output = "<text:span";
         ODe_writeAttribute(output, "text:style-name", ODe_Style_Style::convertStyleToNCName(styleName) );
 
@@ -413,12 +415,12 @@ ODe_Text_Listener::openSpanForRevisionToBuffer( const PP_Revision* pAP,
                 ODe_writeAttribute(output, "delta:insertion-type", insertionType );
             }
         }
-        output += ">";
 
         ss << output.utf8_str();
         if( !ss.str().empty() )
             postss << "</text:span>";
     }
+    return ret;
 }
 
 
@@ -438,7 +440,7 @@ prepend( std::stringstream& ss, const std::stringstream& prefix )
  * 
  */
 void
-ODe_Text_Listener::openSpan(const PP_AttrProp* pAP)
+ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
 {
     std::string styleName;
     bool ok;
@@ -594,19 +596,43 @@ ODe_Text_Listener::openSpan(const PP_AttrProp* pAP)
                 }
             }
 
+            std::list< const PP_Revision* > aclist;
+            bool openedSpan = false;
             std::stringstream postambless;
             const PP_Revision* r = 0;
-            for( int raIdx = 0;
-                 raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
-                 raIdx++ )
+            for( int raIdx = ra.getRevisionsCount()-1;
+                 raIdx >= 0 && (r = ra.getNthRevision( raIdx ));
+                 --raIdx )
+            // for( int raIdx = 0;
+            //      raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
+            //      raIdx++ )
             {
                 std::stringstream press;
                 std::stringstream postss;
-                
-                openSpanForRevisionToBuffer( r, press, postss );
-                ODe_writeUTF8String( m_pParagraphContent, press.str().c_str() );
-                postambless << postss.str();
+
+                if( !openedSpan )
+                {
+                    openedSpan |= openSpanForRevisionToBuffer( r, press, postss );
+                    ODe_writeUTF8String( m_pParagraphContent, press.str().c_str() );
+                    postambless << postss.str();
+                    aclist.push_front( r );
+                }
+                else
+                {
+                    aclist.push_front( r );
+
+                    UT_DEBUGMSG(("openspan() ac:change revid:%d style-name:%s\n",
+                                 r->getId(),
+                                 ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles ).c_str() ));
+                }
             }
+
+            ChangeTrackingACChange acChange;
+            acChange.setAttributeLookupFunction( "text:style-name", acChange.getLookupODFStyleFunctor( m_rAutomatiStyles ) );
+            UT_DEBUGMSG(("openspan() ac:change list size:%d\n", aclist.size() ));
+            UT_DEBUGMSG(("openspan() ac:change attrs:%s\n", acChange.createACChange( aclist ).c_str() ));
+            ODe_writeString( m_pParagraphContent, acChange.createACChange( aclist ) );
+            ODe_writeString( m_pParagraphContent, ">" );
             UT_DEBUGMSG(("ODe_Text_Listener::openSpan() postambless:%s\n", postambless.str().c_str() ));
             prepend( ctpTextSpanEnclosingElementCloseStream, postambless );
         }

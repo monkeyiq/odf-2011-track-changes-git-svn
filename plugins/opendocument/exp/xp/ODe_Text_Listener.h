@@ -181,7 +181,7 @@ private:
     bool m_ctDeltaMergeJustStarted;                             //< if we start a DM then close XML element tags are ommitted.
     void ctDeltaMerge_cleanup();
 
-    void openSpanForRevisionToBuffer( const PP_Revision* pAP, std::stringstream& ss, std::stringstream& postss );
+    bool openSpanForRevisionToBuffer( const PP_Revision* pAP, std::stringstream& ss, std::stringstream& postss );
 
     
     /**

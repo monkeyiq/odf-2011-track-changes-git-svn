@@ -97,9 +97,9 @@ void ODi_Style_Style::startElement(const gchar* pName,
         
     } else if (!strcmp("style:text-properties", pName)) {
 
-        m_fontWeight = "normal";
-        m_textDecoration = "none";
-        m_fontStyle = "normal";
+        // m_fontWeight = "normal";
+        // m_textDecoration = "none";
+        // m_fontStyle = "normal";
         _parse_style_textProperties(ppAtts);
         
     } else if (!strcmp("style:section-properties", pName)) {

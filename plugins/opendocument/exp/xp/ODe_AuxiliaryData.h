@@ -35,6 +35,10 @@
 class PP_AttrProp;
 class PP_RevisionAttr;
 class ODe_AuxiliaryData;
+class ODe_AutomaticStyles;
+
+#include <boost/function.hpp>
+
 
 /**
  * All paragraph styles used to define the chapter levels of a document are
@@ -373,6 +377,7 @@ class ChangeTrackingACChange
     int m_changeID;
     typedef std::list< std::string > m_attributesToSave_t;
     m_attributesToSave_t m_attributesToSave;
+
     
   public:
 
@@ -386,6 +391,30 @@ class ChangeTrackingACChange
     
     ChangeTrackingACChange();
 
+    /**
+     * Which attributes from the revisions passed to createACChange() should be
+     * saved into ac:change attributes
+     */
+    void setAttributesToSave( const std::string& s );
+    void setAttributesToSave( const std::list< std::string >& l );
+    const std::list< std::string >& getAttributesToSave();
+
+    /**
+     * A function responsible for getting the value of "attribute" from the pAP.
+     * Note that this function can infact use other attributes or state to generate
+     * its output "value". For example, styles might check any number of real attributes
+     * in pAP and lookup or generate an automatic style in the document state and return
+     * its name.
+     */
+    typedef boost::function< std::string ( const PP_Revision*, std::string ) > m_attrRead_f;
+    typedef std::map< std::string, m_attrRead_f > m_attrlookups_t;
+    m_attrlookups_t m_attrlookups;
+    void setAttributeLookupFunction( const std::string& n, m_attrRead_f f );
+    void clearAttributeLookupFunctions();
+    m_attrRead_f getLookupODFStyleFunctor( ODe_AutomaticStyles& as );
+    m_attrRead_f getUTGetAttrFunctor();
+
+    
     /**
      * Create an ac:change attribute for the given rev, type and attribute value change.
      * Note that the revision should show the oldValue for the attribute and change type,
@@ -419,6 +448,15 @@ class ChangeTrackingACChange
      * Create ac:changeXXX attributes for the explicit list of revisions given
      */
     std::string createACChange( std::list< const PP_Revision* > rl );
+
+  private:
+
+    std::string handleRevAttr( const PP_Revision* r,
+                               std::map< std::string, const PP_Revision* >& attributesSeen,
+                               m_attrRead_f f,
+                               std::string attr,
+                               const char* newValue );
+
 };
 
     

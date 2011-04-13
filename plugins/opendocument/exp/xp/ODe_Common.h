@@ -46,6 +46,7 @@ void ODe_writeToStream (GsfOutput* stream, const char* const message [],
     size_t nElements);
 
 void ODe_writeUTF8String (GsfOutput* output, const UT_UTF8String& str);
+void ODe_writeString (GsfOutput* output, const std::string& str);
 
 void ODe_writeAttribute(UT_UTF8String& rOutput,
                         const gchar* pName,
