@@ -599,6 +599,7 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
             std::list< const PP_Revision* > aclist;
             bool openedSpan = false;
             std::stringstream postambless;
+            UT_uint32 spanidref = 0;
             const PP_Revision* r = 0;
             for( int raIdx = ra.getRevisionsCount()-1;
                  raIdx >= 0 && (r = ra.getNthRevision( raIdx ));
@@ -615,6 +616,7 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
                     openedSpan |= openSpanForRevisionToBuffer( r, press, postss );
                     ODe_writeUTF8String( m_pParagraphContent, press.str().c_str() );
                     postambless << postss.str();
+                    spanidref = r->getId();
                     aclist.push_front( r );
                 }
                 else
@@ -628,11 +630,16 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
             }
 
             ChangeTrackingACChange acChange;
-            acChange.setAttributeLookupFunction( "text:style-name", acChange.getLookupODFStyleFunctor( m_rAutomatiStyles ) );
+            acChange.setCurrentRevision( spanidref );
+            acChange.setAttributeLookupFunction( "text:style-name", acChange.getLookupODFStyleFunctor( m_rAutomatiStyles, m_rStyles ) );
             UT_DEBUGMSG(("openspan() ac:change list size:%d\n", aclist.size() ));
             UT_DEBUGMSG(("openspan() ac:change attrs:%s\n", acChange.createACChange( aclist ).c_str() ));
-            ODe_writeString( m_pParagraphContent, acChange.createACChange( aclist ) );
-            ODe_writeString( m_pParagraphContent, ">" );
+            if( openedSpan )
+            {
+                ODe_writeString( m_pParagraphContent, acChange.createACChange( aclist ) );
+                ODe_writeString( m_pParagraphContent, ">" );
+            }
+            
             UT_DEBUGMSG(("ODe_Text_Listener::openSpan() postambless:%s\n", postambless.str().c_str() ));
             prepend( ctpTextSpanEnclosingElementCloseStream, postambless );
         }
@@ -1851,6 +1858,7 @@ std::string UT_getLatestAttribute( const PP_AttrProp* pAP,
 void
 ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
                                              UT_UTF8String& output,
+                                             UT_uint32 paragraphIdRef,
                                              const std::string& additionalElementAttributes,
                                              bool closeElementWithSlashGreaterThan,
                                              std::list< const PP_Revision* > revlist,
@@ -1981,11 +1989,14 @@ ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
             }
             output += " ";
             ChangeTrackingACChange acChange;
+            acChange.setCurrentRevision( paragraphIdRef );
+            acChange.setAttributesToSave("");
+            acChange.setAttributeLookupFunction( "text:style-name", acChange.getLookupODFStyleFunctor( m_rAutomatiStyles, m_rStyles ) );
             if( revlist.empty() )
                 output += acChange.createACChange( pAP, ctHighestRemoveLeavingContentStartRevision );
             else
                 output += acChange.createACChange( revlist );
-            output += additionalElementAttributes;
+            output += " " + additionalElementAttributes;
             m_isHeadingParagraph = true;
             
         }
@@ -2003,11 +2014,14 @@ ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
             }
             output += " ";
             ChangeTrackingACChange acChange;
+            acChange.setCurrentRevision( paragraphIdRef );
+            acChange.setAttributesToSave("");
+            acChange.setAttributeLookupFunction( "text:style-name", acChange.getLookupODFStyleFunctor( m_rAutomatiStyles, m_rStyles ) );
             if( revlist.empty() )
                 output += acChange.createACChange( pAP, ctHighestRemoveLeavingContentStartRevision );
             else
                 output += acChange.createACChange( revlist );
-            output += additionalElementAttributes;
+            output += " " + additionalElementAttributes;
             
             m_isHeadingParagraph = false;
         }
@@ -2067,6 +2081,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
     m_ctpTextPEnclosingElementCloseStream.rdbuf()->str("");
     m_ctpParagraphAdditionalSpacesOffset = 0;
     std::stringstream paragraphSplitPostamble;
+    UT_uint32 paragraphIdRef = 1;
 
     // PURE DEBUG BLOCK
     {
@@ -2248,6 +2263,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
             UT_DEBUGMSG(("ODTCT change of text:p/h revisionStack.sz:%d\n", revisionStack.size() ));
             ctHighestRemoveLeavingContentStartRevision = r->getId();
             _openODParagraphToBuffer( r, o,
+                                      r->getId(),
                                       additionalElementAttributes,
                                       closeElementWithSlashGreaterThan,
                                       revisionStack );
@@ -2458,9 +2474,10 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
             m_ctpTextPEnclosingElementCloseStream << "</delta:removed-content>" << endl;
             m_ctpParagraphAdditionalSpacesOffset = 1;
 
+            paragraphIdRef = ctp->getData().getVersionWhichIntroducesParagraph();
             additionalElementAttributesStream << " delta:insertion-type=\"" << insType << "\" "
                                               << " delta:insertion-change-idref=\""
-                                              << m_rAuxiliaryData.toChangeID( ctp->getData().getVersionWhichIntroducesParagraph())
+                                              << m_rAuxiliaryData.toChangeID( paragraphIdRef )
                                               << "\" ";
         }
         else
@@ -2534,10 +2551,11 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
                 UT_DEBUGMSG(("lastStyleVersion:%d\n", lastStyleVersion ));
                 idref = lastStyleVersion;
             }
-            
+
+            paragraphIdRef = idref;
             additionalElementAttributesStream << " delta:insertion-type=\"" << insType << "\" "
                                               << " delta:insertion-change-idref=\""
-                                              << m_rAuxiliaryData.toChangeID( idref )
+                                              << m_rAuxiliaryData.toChangeID( paragraphIdRef )
                                               << "\" ";
             UT_DEBUGMSG(("additionalElementAttributesStream:%s\n",
                          additionalElementAttributesStream.str().c_str() ));
@@ -2560,6 +2578,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
 //    output += "<!--- -->";
     _openODParagraphToBuffer( pAP,
                               output,
+                              paragraphIdRef,
                               additionalElementAttributesStream.str(),
                               startOfParagraphWasDeleted,
                               std::list< const PP_Revision* >(),

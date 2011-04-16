@@ -383,6 +383,19 @@ ODi_Office_Styles::getParagraphStyle( const gchar* pStyleName,
 }
 
 
+const ODi_Style_Style*
+ODi_Office_Styles::getStyle( StyleType t, const gchar* pStyleName, bool bOnContentStream) const
+{
+    switch(t)
+    {
+        case StyleText: return getTextStyle( pStyleName, bOnContentStream );
+        case StylePara: return getParagraphStyle( pStyleName, bOnContentStream );
+    }
+    return 0;
+}
+
+
+
 /**
  * 
  */

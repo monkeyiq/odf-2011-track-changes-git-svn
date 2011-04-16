@@ -36,6 +36,7 @@ class PP_AttrProp;
 class PP_RevisionAttr;
 class ODe_AuxiliaryData;
 class ODe_AutomaticStyles;
+class ODe_Styles;
 
 #include <boost/function.hpp>
 
@@ -377,7 +378,9 @@ class ChangeTrackingACChange
     int m_changeID;
     typedef std::list< std::string > m_attributesToSave_t;
     m_attributesToSave_t m_attributesToSave;
+    UT_uint32 m_currentRevision;
 
+    bool isAllInsertAtRevision( UT_uint32 v, std::list< const PP_Revision* > rl );
     
   public:
 
@@ -392,11 +395,22 @@ class ChangeTrackingACChange
     ChangeTrackingACChange();
 
     /**
+     * When writing out attributes, it doesn't make much sense to write an insert
+     * record unless the insert is a different revision than this "current" value.
+     * Having this allows many attributes to be recorded, some of which might still
+     * have the single setting but have been set before the overall version of the XML element
+     * eg:
+     * <p idref=5 ac:change1="insert,2,foo," ac:change2="insert,5,text:style-name," ... />
+     */
+    void setCurrentRevision( UT_uint32 v );
+    
+    /**
      * Which attributes from the revisions passed to createACChange() should be
      * saved into ac:change attributes
      */
     void setAttributesToSave( const std::string& s );
     void setAttributesToSave( const std::list< std::string >& l );
+    void removeFromAttributesToSave( const std::string& s );
     const std::list< std::string >& getAttributesToSave();
 
     /**
@@ -411,7 +425,7 @@ class ChangeTrackingACChange
     m_attrlookups_t m_attrlookups;
     void setAttributeLookupFunction( const std::string& n, m_attrRead_f f );
     void clearAttributeLookupFunctions();
-    m_attrRead_f getLookupODFStyleFunctor( ODe_AutomaticStyles& as );
+    m_attrRead_f getLookupODFStyleFunctor( ODe_AutomaticStyles& as, ODe_Styles& rStyles );
     m_attrRead_f getUTGetAttrFunctor();
 
     

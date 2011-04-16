@@ -31,6 +31,7 @@
 // Internal includes
 #include "ODi_ListenerState.h"
 #include "pp_Revision.h"
+#include "ODi_Office_Styles.h"
 
 // AbiWord includes
 #include <ut_types.h>
@@ -251,8 +252,12 @@ private:
         std::string     m_prop;
         spanStyle( const ODi_Style_Style* pStyle = 0, UT_uint32 rev = 0, PP_RevisionType rt = PP_REVISION_NONE );
         const gchar** set( const gchar** ppAtts );
+        PP_RevisionAttr& addRevision( PP_RevisionAttr& ra );
+        static spanStyle getDefault();
     };
-    typedef std::list< spanStyle > m_ctSpanStack_t;
+    // This would be best as a list< PP_RevisionAttr > but there are some ownership issues
+    // with copying those which I'm not aware of yet.
+    typedef std::list< std::string > m_ctSpanStack_t;
     m_ctSpanStack_t m_ctSpanStack;
     
     //
@@ -279,21 +284,24 @@ private:
     // ODF styles for headings are slightly different to those
     // for Abiword abw format, this method should convert to an abiword
     // style if one can be worked out.
-    std::string convertODFStyleNameToAbiStyleName( const std::string odfStyleName,
-                                                   ODi_Office_Styles* pStyles,
-                                                   bool bOnContentStream );
+    // FIXME: MIQ: Delete this, it was a wrong assumption!
+    /* std::string convertODFStyleNameToAbiStyleName( const std::string odfStyleName, */
+    /*                                                ODi_Office_Styles* pStyles, */
+    /*                                                bool bOnContentStream ); */
 
     //
     //
     //
     PP_RevisionAttr& ctAddACChange( PP_RevisionAttr& ra, const gchar** ppAtts );
     PP_RevisionAttr  ctGetACChange( const gchar** ppAtts );
-    
+    PP_RevisionAttr& ctAddACChangeODFTextStyle( PP_RevisionAttr& ra, const gchar** ppAtts, ODi_Office_Styles::StyleType t );
+
 
     
     /*************************************
      * Some other stuff
      */
+    const ODi_Style_Style* getParagraphStyle( const gchar* pStyleName ) const;
     
 };
 

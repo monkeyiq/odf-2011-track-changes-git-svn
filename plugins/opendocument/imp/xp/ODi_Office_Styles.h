@@ -94,6 +94,17 @@ public:
         _buildAbiPropsAttrString(rFontFaceDecls);
         _defineAbiStyles(pDocument);
     }
+
+    typedef enum 
+    {
+        StyleText = 1,
+        StylePara,
+        StyleSection,
+        StyleGraphic,
+        StyleNull
+    } StyleType;
+    const ODi_Style_Style* getStyle( StyleType t, const gchar* pStyleName, bool bOnContentStream ) const;
+    
     
     const ODi_Style_Style* getTextStyle(const gchar* pStyleName,
                                        bool bOnContentStream) const;

@@ -71,6 +71,8 @@ class ABI_EXPORT PP_Revision: public PP_AttrProp
 	
 	bool operator == (const PP_Revision &op2) const;
 
+//    PP_Revision* clone() const;
+    
   private:
 	void             _refreshString() const;
 	bool             _handleNestedRevAttr();
@@ -131,6 +133,7 @@ class ABI_EXPORT PP_RevisionAttr
 	~PP_RevisionAttr();
 
 	void                  setRevision(const gchar * r);
+	void                  setRevision(std::string&  r);
 
 	void                  addRevision(UT_uint32 iId,
 									  PP_RevisionType eType,
@@ -178,8 +181,13 @@ class ABI_EXPORT PP_RevisionAttr
 	void                  forceDirty() {m_bDirty = true;}
 	bool                  isFragmentSuperfluous() const;
 
-	bool operator == (const PP_RevisionAttr &op2) const;
+	bool operator== (const PP_RevisionAttr &op2) const;
 
+    // MIQ: This would be nice, but there are ownership issues I don't know about with Memory
+//    PP_RevisionAttr& operator=(const PP_RevisionAttr &rhs);
+    
+    void mergeAll( const PP_RevisionAttr& ra );
+    
   private:
 	void _init(const gchar *r);
 	void _clear();

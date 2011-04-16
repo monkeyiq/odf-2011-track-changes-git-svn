@@ -197,6 +197,7 @@ private:
                                                         const char* attrDefault );
     void _openODParagraphToBuffer( const PP_AttrProp* pAP,
                                    UT_UTF8String& output,
+                                   UT_uint32 paragraphIdRef,
                                    const std::string& additionalElementAttributes = "",
                                    bool closeElementWithSlashGreaterThan = false,
                                    std::list< const PP_Revision* > rl = std::list< const PP_Revision* >(),

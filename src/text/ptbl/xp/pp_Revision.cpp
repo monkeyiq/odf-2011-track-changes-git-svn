@@ -293,6 +293,13 @@ bool PP_Revision::operator == (const PP_Revision &op2) const
 	return true;
 }
 
+// PP_Revision*
+// PP_Revision::clone() const
+// {
+//     PP_Revision* ret = new PP_Revision( *this );
+//     return ret;
+// }
+
 
 /************************************************************
  ************************************************************/
@@ -326,6 +333,14 @@ void PP_RevisionAttr::setRevision(const gchar * r)
 	_clear();
 	_init(r);
 }
+
+void
+PP_RevisionAttr::setRevision(std::string&  r)
+{
+    setRevision( r.c_str() );
+}
+
+
 
 /*! destroys all internal data */
 void PP_RevisionAttr::_clear()
@@ -926,6 +941,36 @@ void PP_RevisionAttr::addRevision(UT_uint32 iId, PP_RevisionType eType,
 	m_pLastRevision = NULL;
 }
 
+void PP_RevisionAttr::mergeAll( const PP_RevisionAttr& ra )
+{
+    PP_RevisionAttr us( getXMLstring() );
+    _clear();
+
+    std::string tmp = (std::string)us.getXMLstring() + "," + ra.getXMLstring();
+    setRevision( tmp.c_str() );
+    return;
+    
+
+    // const PP_Revision* r = 0;
+    // for( int raIdx = 0;
+    //      raIdx < us.getRevisionsCount() && (r = us.getNthRevision( raIdx ));
+    //      raIdx++ )
+    // {
+    //     m_vRev.addItem((void*)r->clone());
+    // }
+    // for( int raIdx = 0;
+    //      raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
+    //      raIdx++ )
+    // {
+    //     m_vRev.addItem((void*)r->clone());
+    // }
+    
+    // m_bDirty = true;
+	// m_iSuperfluous = 0;
+	// m_pLastRevision = NULL;
+}
+
+
 /*! removes id from this revision, respecting the sign, i.e., it will
   not remove -5 if given 5
  */
@@ -1110,7 +1155,7 @@ bool PP_RevisionAttr::isFragmentSuperfluous() const
 		return false;
 }
 
-bool PP_RevisionAttr::operator == (const PP_RevisionAttr &op2) const
+bool PP_RevisionAttr::operator== (const PP_RevisionAttr &op2) const
 {
 	for(UT_sint32 i = 0; i < m_vRev.getItemCount(); i++)
 	{
@@ -1126,6 +1171,15 @@ bool PP_RevisionAttr::operator == (const PP_RevisionAttr &op2) const
 	}
 	return true;
 }
+
+// PP_RevisionAttr&
+// PP_RevisionAttr::operator=(const PP_RevisionAttr &rhs)
+// {
+//     setRevision( rhs.getXMLstring() );
+//     return *this;
+// }
+
+
 
 /*! returns true if after revision iId this fragment carries revised
     property pName, the value of which will be stored in pValue; see

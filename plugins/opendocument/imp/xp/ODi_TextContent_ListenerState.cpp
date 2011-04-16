@@ -143,6 +143,9 @@ private:
 
 class ChangeTrackingACChange
 {
+    typedef std::list< std::string > m_attributesToIgnore_t;
+    m_attributesToIgnore_t m_attributesToIgnore;
+    
     std::string nextACValueToken( std::string& v ) const
     {
         std::string ret = "";
@@ -190,6 +193,12 @@ public:
 
     ChangeTrackingACChange( ODi_ListenerState* ols );
 
+    void addToAttributesToIgnore( const std::string& s )
+    {
+        m_attributesToIgnore.push_back(s);
+    }
+    
+
 
     PP_RevisionAttr& ctAddACChange( PP_RevisionAttr& ra, const gchar** ppAtts );
 
@@ -215,6 +224,18 @@ protected:
 /************************************************************/
 /************************************************************/
 /************************************************************/
+
+bool isSpanStackEffective( PP_RevisionAttr& ra )
+{
+    if( ra.getRevisionsCount() != 1 )
+        return true;
+    
+    const PP_Revision* r = ra.getNthRevision( 0 );
+    if( r->getId() == 0 )
+        return false;
+    return true;
+}
+
 
 /**
  * Constructor
@@ -276,7 +297,11 @@ ODi_TextContent_ListenerState::ODi_TextContent_ListenerState (
 //    z.m_prop = "font-weight:normal;text-decoration:none;font-style:normal";
     z.m_prop = "font-weight:normal;font-style:normal";
     z.m_type = PP_REVISION_ADDITION;
-    m_ctSpanStack.push_back( z );
+
+    PP_RevisionAttr ra;
+    z.addRevision( ra );
+    m_ctSpanStack.push_back( ra.getXMLstring() );
+
 }
 
 
@@ -292,31 +317,31 @@ ODi_TextContent_ListenerState::~ODi_TextContent_ListenerState()
 }
 
 
-std::string
-ODi_TextContent_ListenerState::convertODFStyleNameToAbiStyleName(
-    const std::string odfStyleName,
-    ODi_Office_Styles* pStyles,
-    bool bOnContentStream )
-{
-    UT_DEBUGMSG(("convertODFStyleNameToAbiStyleName() odfStyle:%s\n", odfStyleName.c_str() ));
+// std::string
+// ODi_TextContent_ListenerState::convertODFStyleNameToAbiStyleName(
+//     const std::string odfStyleName,
+//     ODi_Office_Styles* pStyles,
+//     bool bOnContentStream )
+// {
+//     UT_DEBUGMSG(("convertODFStyleNameToAbiStyleName() odfStyle:%s\n", odfStyleName.c_str() ));
 
-    std::string ret = odfStyleName;
-    // In ODe_Style_Style::convertStyleToNCName()
-    // a name like "Heading 1" is made "Heading-1"
-    // there is no reverse method there.
-    //
-    if( ret == "Heading-1" )
-        ret = "Heading 1";
-    if( ret == "Heading-2" )
-        ret = "Heading 2";
-    if( ret == "Heading-3" )
-        ret = "Heading 3";
-    if( ret == "Heading-4" )
-        ret = "Heading 4";
+//     std::string ret = odfStyleName;
+//     // In ODe_Style_Style::convertStyleToNCName()
+//     // a name like "Heading 1" is made "Heading-1"
+//     // there is no reverse method there.
+//     //
+//     if( ret == "Heading-1" )
+//         ret = "Heading 1";
+//     if( ret == "Heading-2" )
+//         ret = "Heading 2";
+//     if( ret == "Heading-3" )
+//         ret = "Heading 3";
+//     if( ret == "Heading-4" )
+//         ret = "Heading 4";
     
-    UT_DEBUGMSG(("convertODFStyleNameToAbiStyleName(end) ret:%s\n", ret.c_str() ));
-    return ret;
-}
+//     UT_DEBUGMSG(("convertODFStyleNameToAbiStyleName(end) ret:%s\n", ret.c_str() ));
+//     return ret;
+// }
 
 
 void
@@ -331,31 +356,24 @@ ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH( const g
 
         UT_DEBUGMSG(("text:x INSIDE rlc-start element chIDRef:%s\n", chIDRef.c_str() ));
         UT_DEBUGMSG(("text:x INSIDE rlc-start element eeIDRef:%s\n", eeIDRef.c_str() ));
-        UT_DEBUGMSG(("text:x style:%s\n", styleName.c_str() ));
+        UT_DEBUGMSG(("text:x1 style:%s\n", styleName.c_str() ));
 
-        styleName = convertODFStyleNameToAbiStyleName( styleName, m_pStyles, m_bOnContentStream );
-        
-        
-        // const ODi_Style_Style* pStyle;
-        // pStyle = m_pStyles->getParagraphStyle( styleName.c_str(), m_bOnContentStream);
-        // if (!pStyle) {
-        //     pStyle = m_pStyles->getTextStyle(styleName.c_str(), m_bOnContentStream);
-        // }
-        // if (!pStyle) {
-        //     pStyle = m_pStyles->getDefaultParagraphStyle();
-        // }
-        // if( pStyle ) 
-        // {
-//        UT_DEBUGMSG(("text:x pstyle:%s\n", pStyle->getDisplayName().utf8_str() ));
+//        styleName = convertODFStyleNameToAbiStyleName( styleName, m_pStyles, m_bOnContentStream );
 
-        ctAddACChange( m_ctLeadingElementChangedRevision, ppAtts );
+        const ODi_Style_Style* pStyle = getParagraphStyle( styleName.c_str() );
+        if( pStyle )
+            styleName = pStyle->getDisplayName().utf8_str();
+        UT_DEBUGMSG(("text:x2 style:%s\n", styleName.c_str() ));
+
+        ctAddACChangeODFTextStyle( m_ctLeadingElementChangedRevision, ppAtts, ODi_Office_Styles::StylePara );
+//        ctAddACChange( m_ctLeadingElementChangedRevision, ppAtts );
         
         const gchar ** pProps = 0;
         propertyArray<> ppAtts;
         ppAtts.push_back( "style" );
         ppAtts.push_back( styleName.c_str() );
         m_ctLeadingElementChangedRevision.addRevision( fromChangeID(chIDRef),
-                                                       PP_REVISION_FMT_CHANGE, // PP_REVISION_ADDITION,
+                                                       PP_REVISION_FMT_CHANGE,
                                                        ppAtts.data(), pProps );
         UT_DEBUGMSG(("text:x rev:%s\n", m_ctLeadingElementChangedRevision.getXMLstring() ));
     }
@@ -393,8 +411,8 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
         const gchar* pStyleName = UT_getAttribute ("text:style-name", ppAtts);
         UT_ASSERT(pStyleName != NULL);
         
-        const ODi_Style_Style* pStyle = m_pStyles->getSectionStyle(pStyleName,
-                                                        m_bOnContentStream);
+        const ODi_Style_Style* pStyle = m_pStyles->getSectionStyle( pStyleName,
+                                                                    m_bOnContentStream);
                                                         
         UT_UTF8String props = "";
 
@@ -574,7 +592,7 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
             pStyleName = UT_getAttribute("text:style-name", ppAtts);
             if (pStyleName) 
             {
-                pStyle = m_pStyles->getParagraphStyle(pStyleName, m_bOnContentStream);
+                pStyle = m_pStyles->getParagraphStyle( pStyleName, m_bOnContentStream );
             }
         
             if (pStyle && (pStyle->isAutomatic()))
@@ -882,34 +900,78 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                 // the point here is that the abiword <c> span for "you" must have rev=!2{bold},!5{italic} in it.
                 //
                 {
-                    UT_DEBUGMSG(("openspan() spanstack.size:%d\n", m_ctSpanStack.size() ));
+                    UT_DEBUGMSG(("openspan(style top) spanstack.size:%d\n", m_ctSpanStack.size() ));
 
                     // FIXME: m_ctSpanStack needs to record many styles for a single "span" due
                     // to ac:change attributes
                     // PP_RevisionAttr ra;
                     // ctAddACChange( ra, ppAtts );
-                    
+
+
+                    PP_RevisionAttr ra;
+
+                    // The revision attribute x will have a series of {version,odt-attr} style
+                    // changes in it, we have to translate the ODF text:style-name into abi props
+                    // from this intermediate ra during the load...
+                    ctAddACChangeODFTextStyle( ra, ppAtts, ODi_Office_Styles::StyleText );
+                    // {
+                    //     PP_RevisionAttr x;
+                    //     ChangeTrackingACChange ct( this );
+
+                    //     ct.ctAddACChange( x, ppAtts );
+                    //     UT_DEBUGMSG(("openspan(acchange) x.sz:%d\n", x.getRevisionsCount() ));
+                    //     const PP_Revision* r = 0;
+                    //     for( int raIdx = 0;
+                    //          raIdx < x.getRevisionsCount() && (r = x.getNthRevision( raIdx ));
+                    //          raIdx++ )
+                    //     {
+                    //         const gchar*       pStyleName = UT_getAttribute( r, "text:style-name", 0 );
+                    //         const ODi_Style_Style* pStyle = m_pStyles->getTextStyle( pStyleName, m_bOnContentStream );
+                    //         UT_DEBUGMSG(("openspan(acchange) rev:%d style:%s\n", r->getId(), pStyleName ));
+                    //         spanStyle z( pStyle, r->getId(), PP_REVISION_FMT_CHANGE );
+                    //         z.addRevision( ra );
+                    //     }
+                    // }
+
+                    UT_DEBUGMSG(("openspan(acchange done) ra:%s\n", ra.getXMLstring() ));
+                    UT_DEBUGMSG(("openspan(2) span-style:%s\n", pStyleName ));
+                    UT_DEBUGMSG(("openspan(2) have-pStyle:%d\n", pStyle!=0 ));
+                        
+                    const gchar* x = UT_getAttribute("delta:insertion-change-idref", ppAtts);
+                    UT_uint32 cid = fromChangeID(x);
                     if( pStyle )
                     {
-                        const gchar* x = UT_getAttribute("delta:insertion-change-idref", ppAtts);
-                        UT_uint32 cid = fromChangeID(x);
-                        m_ctSpanStack.push_back( spanStyle( pStyle, cid, PP_REVISION_FMT_CHANGE ));
+                        UT_DEBUGMSG(("openspan(2) adding span-style:%s\n", pStyleName ));
+                        spanStyle z( pStyle, cid, PP_REVISION_FMT_CHANGE );
+                        z.addRevision( ra );
+                    }
+                    else
+                    {
+                        // FIXME: should abiword actually lookup the "default" style for T2 when there
+                        // is a T2 style with no properties?
+                        // If there is no style, it is the default style.
+                        spanStyle z = spanStyle::getDefault();
+                        z.m_rev = cid;
+                        z.addRevision( ra );
                     }
                     
+
+                    // Do this at any rate so that the closing span can blindly pop it back
+                    m_ctSpanStack.push_back( ra.getXMLstring() );
+                    
+                    
+                    UT_DEBUGMSG(("openspan(2) ra:%s\n", ra.getXMLstring() ));
+                    UT_DEBUGMSG(("openspan(2) spanstack.size:%d\n", m_ctSpanStack.size() ));
                     for( m_ctSpanStack_t::iterator ssi = m_ctSpanStack.begin(); ssi != m_ctSpanStack.end(); ++ssi )
                     {
-                        spanStyle&  z = *ssi;
-                        UT_uint32 wid = z.m_rev;
-                        if( wid == 0 )
-                            continue;
-                    
-                        UT_DEBUGMSG(("openspan() wid:%d z.prop:%s\n", wid, z.m_prop.c_str() ));
-                    
-                        const gchar *  pAttrs[10];
-                        const gchar ** pProps = 0;
-                        z.set( pAttrs );
-                        ctRevision.addRevision( wid, PP_REVISION_FMT_CHANGE, pAttrs, pProps );
+                        std::string s = *ssi;
+                        PP_RevisionAttr ra( s.c_str() );
+                        UT_DEBUGMSG(("openspan(merge) ra:%s\n", ra.getXMLstring() ));
+                        if( isSpanStackEffective( ra ) )
+                            ctRevision.mergeAll( ra );
                     }
+
+                    UT_DEBUGMSG(("openspan(3) ctRevision:%s\n", ctRevision.getXMLstring() ));
                 }
             
                 
@@ -1687,7 +1749,7 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
     else if (!strcmp(pName, "text:span"))
     {
         // close a span
-        spanStyle spanstyle;
+        PP_RevisionAttr spanstyle;
         if( !m_ctSpanStack.empty() )
         {
             // back() is the current style, we want to pop that style off and then see
@@ -1695,9 +1757,8 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
             m_ctSpanStack.pop_back();
             if( !m_ctSpanStack.empty() )
             {
-                spanstyle = m_ctSpanStack.back();
-                UT_DEBUGMSG(("ODTCT closing text:span() attr:%s spanStyle:%s\n",
-                             spanstyle.m_attr.c_str(), spanstyle.m_prop.c_str() ));
+                spanstyle.setRevision( m_ctSpanStack.back() );
+                UT_DEBUGMSG(("ODTCT closing text:span() spanStyle:%s\n", spanstyle.getXMLstring() ));
             }
 
         }
@@ -1725,11 +1786,11 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
         {
             ctAddRemoveStackSetup( ctRevision, m_ctAddRemoveStack );
         }
-        if( spanstyle.m_type != PP_REVISION_NONE )
+        if( isSpanStackEffective( spanstyle ) )
         {
-            ppAttsTop = spanstyle.set( ppAtts );
-            UT_DEBUGMSG(("ODTCT closing text:span(2) attr:%s spanStyle:%s\n",
-                         spanstyle.m_attr.c_str(), spanstyle.m_prop.c_str() ));
+            ctRevision.mergeAll( spanstyle );
+            //ppAttsTop = spanstyle.set( ppAtts );
+            UT_DEBUGMSG(("ODTCT closing text:span(2) spanStyle:%s\n", spanstyle.getXMLstring() ));
         }
         
         if( ppAttsTop != ppAtts || strcmp( ctRevision.getXMLstring(), "0" ))
@@ -2369,6 +2430,24 @@ static UT_uint32 getIntroducingVersion( UT_uint32 cv, const PP_RevisionAttr& ra 
     return ret;
 }
 
+const ODi_Style_Style*
+ODi_TextContent_ListenerState::getParagraphStyle( const gchar* pStyleName ) const
+{
+    if( !pStyleName )
+        return 0;
+    
+    const ODi_Style_Style* pStyle = m_pStyles->getParagraphStyle( pStyleName, m_bOnContentStream );
+
+    if (!pStyle)
+    {
+        pStyle = m_pStyles->getTextStyle(pStyleName, m_bOnContentStream);
+    }
+    if (!pStyle)
+    {
+        pStyle = m_pStyles->getDefaultParagraphStyle();
+    }
+    return pStyle;
+}
 
 
 /**
@@ -2429,11 +2508,46 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         //
         {
             PP_RevisionAttr ra;
-            ra.setRevision( m_ctLeadingElementChangedRevision.getXMLstring() );
-            ctAddACChange( ra, ppParagraphAtts );
+            ra.setRevision( ctRevision.getXMLstring() );
+
+
+// FIXME:MIQ            
+            ////
+            // make sure not to map text:style-name into ra here
+            // we handle text:style-name explicitly below, translating to abiword attributes
+            {
+                ChangeTrackingACChange ct( this );
+                ct.addToAttributesToIgnore( "text:style-name" );
+//                ct.ctAddACChange( ra, ppParagraphAtts );
+            }
+            UT_DEBUGMSG(("openpara(acchange top) ct:%s\n", ctRevision.getXMLstring() ));
+            UT_DEBUGMSG(("openpara(acchange top) ra:%s\n", ra.getXMLstring() ));
+
+
+            //
+            // Have to map text:style-name back into something that
+            // abiword will understand. 
+            //
+            ctAddACChangeODFTextStyle( ra, ppParagraphAtts, ODi_Office_Styles::StylePara );
+            // PP_RevisionAttr x;
+            // ChangeTrackingACChange ct( this );
+            // ct.ctAddACChange( x, ppParagraphAtts );
+            // const PP_Revision* r = 0;
+            // for( int raIdx = 0;
+            //      raIdx < x.getRevisionsCount() && (r = x.getNthRevision( raIdx ));
+            //      raIdx++ )
+            // {
+            //     const ODi_Style_Style* pStyle = getParagraphStyle( UT_getAttribute( r, "text:style-name", 0 ) );
+            //     UT_DEBUGMSG(("openpara(acchange r) rev:%d have-pStyle:%d style:%s\n", r->getId(), pStyle!=0, pStyleName ));
+            //     spanStyle z( pStyle, r->getId(), PP_REVISION_FMT_CHANGE );
+            //     z.addRevision( ra );
+            // }
+
+            UT_DEBUGMSG(("openpara(acchange) m_ctLeadingElementChangedRevision:%s\n", m_ctLeadingElementChangedRevision.getXMLstring() ));
+            UT_DEBUGMSG(("openpara(acchange) ra:%s\n", ra.getXMLstring() ));
+
             ctRevision.setRevision(ra.getXMLstring());
-
-
+            
             
 //            PP_RevisionAttr ra = ctGetACChange( ppParagraphAtts );
 //            ctRevision.setRevision(ra.getXMLstring());
@@ -2504,27 +2618,13 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         }
 
         pStyleName = UT_getAttribute ("text:style-name", ppParagraphAtts);
-        if (pStyleName)
-        {
-            pStyle = m_pStyles->getParagraphStyle(pStyleName, m_bOnContentStream);
-
-            if (!pStyle)
-            {
-                pStyle = m_pStyles->getTextStyle(pStyleName, m_bOnContentStream);
-            }
-            
-            // Damn, use the default style
-            if (!pStyle)
-            {
-                pStyle = m_pStyles->getDefaultParagraphStyle();
-            }
-        }
-        else
+        pStyle = getParagraphStyle( pStyleName );
+        if( !pStyle )
         {
             // Use the default style
             pStyle = m_pStyles->getDefaultParagraphStyle();
         }
-
+        
         if( pStyle )
             UT_DEBUGMSG(("para:style:%s\n", pStyle->getDisplayName().utf8_str() ));
         UT_DEBUGMSG(("ctInsertionChangeIDRef:%s\n", ctInsertionChangeIDRef.c_str() ));
@@ -2541,7 +2641,7 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             UT_DEBUGMSG(("leading style:%s\n", m_ctLeadingElementChangedRevision.getXMLstring() ));
 
             if( !strcmp( pStyle->getDisplayName().utf8_str(), "Normal" )
-                && !strlen(m_ctLeadingElementChangedRevision.getXMLstring()) )
+                && !strlen(ctRevision.getXMLstring()) )
             {
                 UT_DEBUGMSG(("para has normal style and there are no leading styles to negate.\n" ));
             }
@@ -2984,29 +3084,22 @@ void ODi_TextContent_ListenerState::_endParagraphElement (
    
     pStyleName = m_rElementStack.getStartTag(0)->
                     getAttributeValue("text:style-name");
-                    
-    if (pStyleName) {
-        pStyle = m_pStyles->getParagraphStyle(pStyleName, m_bOnContentStream);
 
-        if (!pStyle) {
-            pStyle = m_pStyles->getTextStyle(pStyleName, m_bOnContentStream);
-        }
-        
-        // Damn, use the default style
-        if (!pStyle) {
-            pStyle = m_pStyles->getDefaultParagraphStyle();
-        }
-    } else {
+    pStyle = getParagraphStyle( pStyleName );
+    if (!pStyle)
+    {
         // Use the default style
         pStyle = m_pStyles->getDefaultParagraphStyle();
     }
     
-    if (pStyle != NULL) {
+    if( pStyle )
+    {
         m_pendingParagraphBreak = pStyle->getBreakAfter();
     }
     
     
-    if (!m_rElementStack.hasElement("text:note-body")) {
+    if (!m_rElementStack.hasElement("text:note-body"))
+    {
         // Footnotes/endnotes can't have frames.
         
         // Bring back the possible postponed parsing of a <draw:frame>
@@ -3221,6 +3314,22 @@ ChangeTrackingACChange::ChangeTrackingACChange( ODi_ListenerState* ols )
 {
 }
 
+template < class container1, class container2 >
+container1&
+remove( container1& ret, const container2& matches )
+{
+    typedef typename container2::const_iterator C2ITER;
+    typedef typename container1::iterator C1ITER;
+    
+    for( C2ITER mi = matches.begin(); mi != matches.end(); ++mi )
+    {
+        C1ITER iter = find( ret.begin(), ret.end(), *mi );
+        if( iter != ret.end() )
+            ret.erase( iter );
+    }
+    return ret;
+}
+
 ChangeTrackingACChange::attributeList_t
 ChangeTrackingACChange::getACAttributes( const gchar** ppAtts )
 {
@@ -3229,6 +3338,10 @@ ChangeTrackingACChange::getACAttributes( const gchar** ppAtts )
         std::remove_if( attributeList.begin(), attributeList.end(),
                         std::not1( std::bind2nd( startswith(), "ac:" ))),
         attributeList.end() );
+
+    // remove any attributes which are in m_attributesToIgnore
+    remove( attributeList, m_attributesToIgnore );
+    
     return attributeList;
 }
 
@@ -3455,6 +3568,39 @@ ODi_TextContent_ListenerState::ctAddACChange( PP_RevisionAttr& ra, const gchar**
     return ra;
 }
 
+PP_RevisionAttr&
+ODi_TextContent_ListenerState::ctAddACChangeODFTextStyle( PP_RevisionAttr& ra, const gchar** ppAtts, ODi_Office_Styles::StyleType t )
+{
+    PP_RevisionAttr x;
+    ChangeTrackingACChange ct( this );
+
+    ct.ctAddACChange( x, ppAtts );
+    UT_DEBUGMSG(("ctAddACChangeODFTextStyle(acchange) x.sz:%d\n", x.getRevisionsCount() ));
+    const PP_Revision* r = 0;
+    for( int raIdx = 0;
+         raIdx < x.getRevisionsCount() && (r = x.getNthRevision( raIdx ));
+         raIdx++ )
+    {
+        const gchar*       pStyleName = UT_getAttribute( r, "text:style-name", 0 );
+        const ODi_Style_Style* pStyle = 0;
+        switch(t)
+        {
+            case ODi_Office_Styles::StylePara:
+                pStyle = getParagraphStyle( pStyleName );
+                break;
+            case ODi_Office_Styles::StyleText:
+                pStyle = m_pStyles->getTextStyle( pStyleName, m_bOnContentStream );
+                break;
+        }
+        
+        UT_DEBUGMSG(("openspan(acchange) rev:%d style:%s\n", r->getId(), pStyleName ));
+        spanStyle z( pStyle, r->getId(), PP_REVISION_FMT_CHANGE );
+        z.addRevision( ra );
+    }
+    return ra;
+}
+
+
 PP_RevisionAttr
 ODi_TextContent_ListenerState::ctGetACChange( const gchar** ppAtts )
 {
@@ -3501,5 +3647,27 @@ ODi_TextContent_ListenerState::spanStyle::set( const gchar** ppAtts )
     ppAtts[1] = m_prop.c_str();
     ppAtts[2] = 0;
     return &ppAtts[2];
+}
+
+
+PP_RevisionAttr&
+ODi_TextContent_ListenerState::spanStyle::addRevision( PP_RevisionAttr& ra )
+{
+    const gchar *  pAttrs[10];
+    const gchar ** pProps = 0;
+    set( pAttrs );
+    ra.addRevision( m_rev, m_type, pAttrs, pProps );
+    return ra;
+}
+
+
+ODi_TextContent_ListenerState::spanStyle
+ODi_TextContent_ListenerState::spanStyle::getDefault()
+{
+    spanStyle z;
+    z.m_attr = "props";
+    z.m_prop = "font-weight:normal;text-decoration:none;font-style:normal";
+    z.m_type = PP_REVISION_FMT_CHANGE;
+    return z;
 }
 

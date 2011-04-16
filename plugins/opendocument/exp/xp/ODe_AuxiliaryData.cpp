@@ -563,12 +563,19 @@ getDefaultODFValueForAttribute( const std::string& attr )
 }
 
 ChangeTrackingACChange::ChangeTrackingACChange()
-    :
-    m_changeID(0)
+    : m_changeID(0)
+    , m_currentRevision(0)
 {
     m_attributesToSave.push_back( "text:outline-level" );
     m_attributesToSave.push_back( "style" );
 }
+
+void
+ChangeTrackingACChange::setCurrentRevision( UT_uint32 v )
+{
+    m_currentRevision = v;
+}
+
 
 
 void
@@ -586,6 +593,18 @@ ChangeTrackingACChange::setAttributesToSave( const std::list< std::string >& l )
     m_attributesToSave.clear();
     m_attributesToSave = l;
 }
+
+void
+ChangeTrackingACChange::removeFromAttributesToSave( const std::string& s )
+{
+    m_attributesToSave_t::iterator iter = find( m_attributesToSave.begin(), m_attributesToSave.end(), s );
+    if( iter != m_attributesToSave.end() )
+    {
+        m_attributesToSave.erase( iter );
+    }
+}
+
+
 
 const std::list< std::string >&
 ChangeTrackingACChange::getAttributesToSave()
@@ -684,10 +703,10 @@ ChangeTrackingACChange::clearAttributeLookupFunctions()
 struct LookupODFStyleFunctor
 {
     ODe_AutomaticStyles& m_rAutomatiStyles;
-    
-    LookupODFStyleFunctor( ODe_AutomaticStyles& as )
-        :
-        m_rAutomatiStyles( as )
+    ODe_Styles& m_rStyles;
+    LookupODFStyleFunctor( ODe_AutomaticStyles& as, ODe_Styles& rStyles )
+        : m_rAutomatiStyles( as )
+        , m_rStyles( rStyles )
     {
     }
     
@@ -697,17 +716,18 @@ struct LookupODFStyleFunctor
         UT_DEBUGMSG(("LookupODFStyleFunctor(a) rev:%d stylename:%s\n", pAP->getId(), styleName.c_str() ));
         if( !styleName.empty() )
         {
+            m_rStyles.addStyle( styleName.c_str() );
             UT_DEBUGMSG(("LookupODFStyleFunctor(b) rev:%d stylename:%s\n", pAP->getId(), styleName.c_str() ));
         }
-        return styleName;
+        return ODe_Style_Style::convertStyleToNCName(styleName).utf8_str();
     }
 };
 
 
 ChangeTrackingACChange::m_attrRead_f
-ChangeTrackingACChange::getLookupODFStyleFunctor( ODe_AutomaticStyles& as )
+ChangeTrackingACChange::getLookupODFStyleFunctor( ODe_AutomaticStyles& as, ODe_Styles& rStyles )
 {
-    LookupODFStyleFunctor ret( as );
+    LookupODFStyleFunctor ret( as, rStyles );
     return ret;
 }
 
@@ -787,6 +807,38 @@ ChangeTrackingACChange::handleRevAttr( const PP_Revision* r,
     return str;
 }
 
+bool
+ChangeTrackingACChange::isAllInsertAtRevision( UT_uint32 v, std::list< const PP_Revision* > revlist )
+{
+    bool ret = true;
+    UT_DEBUGMSG(("isAllInsertAtRevision() v:%d\n", v ));
+//    if( !v )
+//        return false;
+    
+    const PP_Revision* r = 0;
+    for( std::list< const PP_Revision* >::iterator ri = revlist.begin();
+         ri != revlist.end(); ++ri )
+    {
+        r = *ri;
+        UT_DEBUGMSG(("isAllInsertAtRevision() rev:%d type:%d astr:%s pstr:%s\n",
+                     r->getId(), r->getType(),
+                     r->getAttrsString(), r->getPropsString() ));
+
+        if( r->getId() == 1 && !strlen(r->getAttrsString()) && !strlen(r->getPropsString()) )
+        {
+            continue;
+        }
+
+        if( r->getId() != v )
+            return false;
+        if( r->getType() == PP_REVISION_DELETION )
+            return false;
+        
+    }
+
+    return ret;
+}
+
 
 
 std::string
@@ -797,6 +849,13 @@ ChangeTrackingACChange::createACChange( std::list< const PP_Revision* > revlist 
 
     UT_DEBUGMSG(("createACChange() revisionsCount:%d\n", revlist.size() ));
 
+    //
+    // if everything in revlist is an insert and is at the same m_currentRevision
+    // then we don't actually have anything of value to write out
+    //
+    if( isAllInsertAtRevision( m_currentRevision, revlist ) )
+        return "";
+    
     //
     // What we really need here is the tuples:
     //   revision, type, attr, old-value
@@ -818,7 +877,7 @@ ChangeTrackingACChange::createACChange( std::list< const PP_Revision* > revlist 
          ri != revlist.end(); ++ri )
     {
         r = *ri;
-
+        
         for( m_attrlookups_t::iterator ai = m_attrlookups.begin(); ai != m_attrlookups.end(); ++ai )
         {
             std::string attr = ai->first;
