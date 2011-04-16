@@ -54,6 +54,11 @@ ODe_HeadingStyles::ODe_HeadingStyles()
     addStyleName( "Heading 2", 2 );
     addStyleName( "Heading 3", 3 );
     addStyleName( "Heading 4", 4 );
+
+    addStyleName( "Heading-1", 1 );
+    addStyleName( "Heading-2", 2 );
+    addStyleName( "Heading-3", 3 );
+    addStyleName( "Heading-4", 4 );
 }
 
 
@@ -219,6 +224,9 @@ ODe_ChangeTrackingParagraph_Data::update( const PP_RevisionAttr* ra, PT_DocPosit
     const PP_Revision* first = ra->getNthRevision(0);
     const PP_Revision* last  = ra->getLastRevision();
 
+    if( !last )
+        last = first;
+    
     UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::update() sz:%d rs:%s\n",
                  ra->getRevisionsCount(), ra->getXMLstring() ));
     for( int iter = ra->getRevisionsCount()-1; iter >= 0; --iter )
@@ -899,52 +907,6 @@ ChangeTrackingACChange::createACChange( std::list< const PP_Revision* > revlist 
             {
                 std::string str = handleRevAttr( r, attributesSeen, getUTGetAttrFunctor(), attr, newValue );
                 ss << str;
-
-                
-                // ac_change_t actype = INVALID;
-                // std::string oldValue = "";
-                
-                // //
-                // // If this is the first time we see this attribute then surely it is
-                // // an INSERT
-                // //
-                // if( !attributesSeen.count(attr))
-                // {
-                //     actype = INSERT;
-                // }
-                // else
-                // {
-                //     //
-                //     // Grab the value of the attribute from the previous revision...
-                //     //
-                //     const PP_Revision* oldr = attributesSeen[ attr ];
-                //     if( const char* v = UT_getAttribute( oldr, attr.c_str(), 0 ))
-                //     {
-                //         oldValue = v;
-                //     }
-                // }
-                
-                // attributesSeen[ attr ] = r;
-
-                // if( actype == INVALID )
-                // {
-                //     switch( r->getType() )
-                //     {
-                //         case PP_REVISION_DELETION:
-                //             actype = REMOVE;
-                //             break;
-                //         case PP_REVISION_ADDITION:
-                //             actype = INSERT;
-                //             break;
-                //         case PP_REVISION_FMT_CHANGE:
-                //         case PP_REVISION_ADDITION_AND_FMT:
-                //             actype = MODIFY;
-                //             break;
-                //     }
-                // }
-                
-                // std::string str = createACChange( r->getId(), actype, attr, oldValue );
-                // ss << str;
             }
         }
     }
