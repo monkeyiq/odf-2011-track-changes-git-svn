@@ -65,5 +65,7 @@ libxp_la_SOURCES = \
 	ODi_XMLRecorder.cpp \
 	ODi_XMLRecorder.h \
 	ODi_TrackedChanges_ListenerState.cpp \
-	ODi_TrackedChanges_ListenerState.h
-
+	ODi_TrackedChanges_ListenerState.h \
+	ODi_ChangeTrackingACChange.h \
+	ODi_ChangeTrackingACChange.cpp \
+	propertyArray.h
