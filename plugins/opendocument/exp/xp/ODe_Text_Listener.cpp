@@ -36,6 +36,8 @@
 #include "ODe_Style_Style.h"
 #include "ODe_Table_Listener.h"
 #include "ODe_Style_PageLayout.h"
+#include "ODe_ChangeTrackingACChange.h"
+#include "ODe_ChangeTrackingDeltaMerge.h"
 
 // AbiWord includes
 #include <pp_AttrProp.h>
@@ -85,10 +87,10 @@ ODe_Text_Listener::ODe_Text_Listener(ODe_Styles& rStyles,
     , m_rAuxiliaryData(rAuxiliaryData)
     , m_zIndex(zIndex)
     , m_iCurrentTOC(0)
+    , m_useChangeTracking( true )
     , m_ctpParagraphAdditionalSpacesOffset(0)
     , m_ctDeltaMerge(0)
     , m_ctDeltaMergeJustStarted(false)
-    , m_useChangeTracking( true )
 {
 }
 
@@ -127,10 +129,10 @@ ODe_Text_Listener::ODe_Text_Listener(ODe_Styles& rStyles,
     , m_rAuxiliaryData(rAuxiliaryData)
     , m_zIndex(zIndex)
     , m_iCurrentTOC(0)
+    , m_useChangeTracking( true )
     , m_ctpParagraphAdditionalSpacesOffset(0)
     , m_ctDeltaMerge(0)
     , m_ctDeltaMergeJustStarted(false)
-    , m_useChangeTracking( true )
 {
 }
 
@@ -233,8 +235,8 @@ void ODe_Text_Listener::closeBlock()
             if( pos > 0 )
                 --pos;
             
-            const gchar* pValue;
-            bool ok;
+//            const gchar* pValue;
+//            bool ok;
             pChangeTrackingParagraphData_t ctp = m_rAuxiliaryData.getChangeTrackingParagraphData( pos );
             // ok = pAP->getAttribute(PT_CHANGETRACKING_SPLIT_ID, pValue);
             // if (ok) UT_DEBUGMSG(("ODTCT closeBlock() split-id-from-attr:%s\n", pValue ));
@@ -330,8 +332,8 @@ void ODe_Text_Listener::closeBlock()
 
 class ODFChangeTrackerIdFactory
 {
+    UT_uint32   m_id;
     std::string m_prefix;
-    UT_uint32 m_id;
 public:
     ODFChangeTrackerIdFactory( const char* prefix = "ctid-" ) : m_id(1) , m_prefix(prefix)
     {
@@ -357,7 +359,7 @@ ODe_Text_Listener::ctDeltaMerge_cleanup()
 bool textChangedAfterRevision( PP_RevisionAttr& ra, UT_uint32 rev )
 {
     const PP_Revision* r = 0;
-    for( int raIdx = ra.getRevisionsCount()-1;
+    for( long raIdx = ra.getRevisionsCount()-1;
          raIdx >= 0 && (r = ra.getNthRevision( raIdx ));
          --raIdx )
     {
@@ -375,7 +377,7 @@ UT_uint32 getHighestRevisionNumberWithStyle( PP_RevisionAttr& ra )
 {
     const PP_Revision* r = 0;
 
-    for( int raIdx = 0;
+    for( UT_uint32 raIdx = 0;
          raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
          raIdx++ )
     {
@@ -443,7 +445,7 @@ void
 ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
 {
     std::string styleName;
-    bool ok;
+//    bool ok;
     const gchar* pValue;
     UT_uint32       styleRev = 0;
     PP_RevisionType styleOp  = PP_REVISION_NONE;
@@ -629,10 +631,10 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
                 }
             }
 
-            ChangeTrackingACChange acChange;
+            ODe_ChangeTrackingACChange acChange;
             acChange.setCurrentRevision( spanidref );
             acChange.setAttributeLookupFunction( "text:style-name", acChange.getLookupODFStyleFunctor( m_rAutomatiStyles, m_rStyles ) );
-            UT_DEBUGMSG(("openspan() ac:change list size:%d\n", aclist.size() ));
+            UT_DEBUGMSG(("openspan() ac:change list size:%d\n", (int)aclist.size() ));
             UT_DEBUGMSG(("openspan() ac:change attrs:%s\n", acChange.createACChange( aclist ).c_str() ));
             if( openedSpan )
             {
@@ -1795,7 +1797,7 @@ ODe_Text_Listener::convertRevisionStringToAttributeStack( const PP_AttrProp* pAP
         PP_RevisionAttr ra( revisionString );
         const PP_Revision* r = 0;
 
-        for( int raIdx = 0;
+        for( UT_uint32 raIdx = 0;
              raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
              raIdx++ )
         {
@@ -1988,7 +1990,7 @@ ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
                 appendAttribute( output, "xml:id", xmlid );
             }
             output += " ";
-            ChangeTrackingACChange acChange;
+            ODe_ChangeTrackingACChange acChange;
             acChange.setCurrentRevision( paragraphIdRef );
             acChange.setAttributesToSave("");
             acChange.setAttributeLookupFunction( "text:style-name", acChange.getLookupODFStyleFunctor( m_rAutomatiStyles, m_rStyles ) );
@@ -2013,7 +2015,7 @@ ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
                 appendAttribute( output, "xml:id", xmlid );
             }
             output += " ";
-            ChangeTrackingACChange acChange;
+            ODe_ChangeTrackingACChange acChange;
             acChange.setCurrentRevision( paragraphIdRef );
             acChange.setAttributesToSave("");
             acChange.setAttributeLookupFunction( "text:style-name", acChange.getLookupODFStyleFunctor( m_rAutomatiStyles, m_rStyles ) );
@@ -2056,7 +2058,7 @@ ODe_Text_Listener::headingStateChanges( const PP_AttrProp* pAPa, const PP_AttrPr
     bool ha = isHeading(pAPa);
     bool hb = isHeading(pAPb);
 
-    return ha && !hb || hb && !ha;
+    return (ha && !hb) || (hb && !ha);
 }
 
 
@@ -2154,7 +2156,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
     // <delta:remove-leaving-content-end delta:end-element-id='ee888'/>
     //
     std::string lastStyleAttribute = "";
-    int lastStyleVersion = 0;
+    UT_uint32   lastStyleVersion   = 0;
     if( const char* revisionString = UT_getAttribute( pAP, "revision", 0 ))
     {
         //
@@ -2181,7 +2183,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
         const PP_Revision* r = 0;
         std::string firstStyleAttribute = "";
         
-        for( int raIdx = 0;
+        for( UT_uint32 raIdx = 0;
              raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
              raIdx++ )
         {
@@ -2260,7 +2262,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
                 }
             }
             
-            UT_DEBUGMSG(("ODTCT change of text:p/h revisionStack.sz:%d\n", revisionStack.size() ));
+            UT_DEBUGMSG(("ODTCT change of text:p/h revisionStack.sz:%d\n", (int)revisionStack.size() ));
             ctHighestRemoveLeavingContentStartRevision = r->getId();
             _openODParagraphToBuffer( r, o,
                                       r->getId(),
@@ -2401,7 +2403,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
         }
 
         UT_DEBUGMSG(("ODTCT wholeD:%d wholeLastD:%d\n",  wholeOfParagraphWasDeleted, wholeOfLastParaWasDeleted ));
-        UT_DEBUGMSG(("ODTCT startD:%d intable:%d\n", startOfParagraphWasDeleted, m_rAuxiliaryData.m_ChangeTrackingAreWeInsideTable ));
+        UT_DEBUGMSG(("ODTCT startD:%d intable:%ld\n", startOfParagraphWasDeleted, m_rAuxiliaryData.m_ChangeTrackingAreWeInsideTable ));
         
         //
         // When two paragraphs are merged together then the old

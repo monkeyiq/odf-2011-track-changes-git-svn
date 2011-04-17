@@ -143,7 +143,6 @@ private:
     bool m_openedODTextboxFrame;
     bool m_openedODNote;
     bool m_bIgoreFirstTab;
-    bool m_useChangeTracking;
 
     // Content of the current paragraph.
     GsfOutput* m_pParagraphContent;
@@ -174,6 +173,7 @@ private:
     // For ODT Change Tracking
     std::stringstream m_ctpTextPBeforeClosingElementStream;  //< output before </text:p> is written
     std::stringstream m_ctpTextPEnclosingElementCloseStream; //< output after  </text:p> is written
+    bool m_useChangeTracking;
     int m_ctpParagraphAdditionalSpacesOffset;                //< adjust m_spacesOffset during close of text:p
     std::list< std::string > m_ctpTextSpanEnclosingElementCloseStreamStack; //< output after </text:span> is written
     int m_ctpSpanAdditionalSpacesOffset;                        //< adjust m_spacesOffset during close of text:span
