@@ -66,7 +66,9 @@ libxp_la_SOURCES = \
 	ODe_ChangeTrackingParagraph_Listener.h \
 	ODe_RevisionsTable.cpp \
 	ODe_RevisionsTable.h   \
-	ODe_ChangeTrackingACChange.h   \
-	ODe_ChangeTrackingACChange.cpp \
-	ODe_ChangeTrackingDeltaMerge.h \
-	ODe_ChangeTrackingDeltaMerge.cpp
+	ODe_ChangeTrackingACChange.h     \
+	ODe_ChangeTrackingACChange.cpp   \
+	ODe_ChangeTrackingDeltaMerge.h   \
+	ODe_ChangeTrackingDeltaMerge.cpp \
+	ODe_ChangeTrackingParagraph.h    \
+	ODe_ChangeTrackingParagraph.cpp

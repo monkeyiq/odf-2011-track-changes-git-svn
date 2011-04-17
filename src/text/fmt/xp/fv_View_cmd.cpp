@@ -4524,12 +4524,12 @@ void FV_View::cmdCut(void)
 
 
 // FIXME: copy from ODe_Text_Listener.cpp
-class ODFChangeTrackerIdFactory
+class ODFChangeTrackerIdFactoryX
 {
     std::string m_prefix;
     UT_uint32 m_id;
 public:
-    ODFChangeTrackerIdFactory( const char* prefix = "ctid-" ) : m_id(1) , m_prefix(prefix)
+    ODFChangeTrackerIdFactoryX( const char* prefix = "ctid-" ) : m_id(1) , m_prefix(prefix)
     {
     };
     std::string createId()
@@ -4539,7 +4539,7 @@ public:
         return ret;
     }
 };
-static ODFChangeTrackerIdFactory m_ctmvIDFactory("mv");
+static ODFChangeTrackerIdFactoryX m_ctmvIDFactory("mv");
 
 
 // bToClipboard is true if you want to copy to the CLIPBOARD
