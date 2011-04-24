@@ -50,6 +50,15 @@ ODi_ListenerState::updateToHandleRemovalVersion( PP_RevisionAttr& ra )
     }
 }
 
+UT_uint32
+ODi_ListenerState::fromChangeID( const char* s )
+{
+    if( !s )
+        return 0;
+    std::string t = s;
+    return fromChangeID( t );
+}
+    
 
 UT_uint32
 ODi_ListenerState::fromChangeID( const std::string s )

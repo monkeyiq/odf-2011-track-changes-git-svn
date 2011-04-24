@@ -244,8 +244,10 @@ private:
     m_ctAddRemoveStack_t m_ctAddRemoveStack;
     PP_RevisionAttr& ctAddRemoveStackSetup( PP_RevisionAttr& ra, m_ctAddRemoveStack_t& stack );
     std::string ctAddRemoveStackGetLast( PP_RevisionType t );
-    struct spanStyle 
+    class spanStyle 
     {
+        void init( const ODi_Style_Style* pStyle );
+      public:
         UT_uint32       m_rev;
         PP_RevisionType m_type;
         std::string     m_attr;
@@ -296,6 +298,39 @@ private:
     PP_RevisionAttr  ctGetACChange( const gchar** ppAtts );
     PP_RevisionAttr& ctAddACChangeODFTextStyle( PP_RevisionAttr& ra, const gchar** ppAtts, ODi_Office_Styles::StyleType t );
 
+    /**
+     * ODF styles state what they want to have, eg italic, bold etc.
+     * An ac:change record for ODF text:style-names just cites the old
+     * and new styles. Abiword change tracking however wants to know
+     * the minimal set of changes that are needed to the old
+     * properties to get the new properties.
+     * 
+     * Given the past style, and the new desired one, create the
+     * changes needed to flow from the old to the new.
+     *
+     * For example;
+     * INPUT    = ...{}...!3{font-style:italic;font-weight:bold}
+     * NEWSTYLE = font-weight:bold
+     * the result would be
+     * RETURNS = !5{font-style:normal}
+     *
+     * That is, we have to change from italic to normal again, but bold is retained.
+     *
+     * old = !2{                  font-weight:bold}
+     * new = !3{font-style:italic;font-weight:bold},
+     * ret = !3{font-style:italic}
+     *
+     * old = !3{font-style:italic;font-weight:bold}
+     * new = !5{                  font-weight:bold}
+     * ret = !5{font-style:normal}
+     *
+     * If it is in the new only, then add it to the result, if it is in the old only
+     * then add a "default" value into the new. if in both, ignore it.
+     * 
+     */
+    void ctSimplifyStyles( PP_RevisionAttr& ra );
+    std::string ctSimplifyFromTwoAdjacentStyles( const PP_Revision * r, const PP_Revision * prev );
+    spanStyle ctSimplifyStyle( const ODi_Style_Style* pBloatedStyle, PP_RevisionAttr& complexRA, UT_uint32 rev, PP_RevisionType rt );
 
     
     /*************************************

@@ -64,6 +64,7 @@ public:
     UT_uint32 getImplicitRemovalVersion();
     void updateToHandleRemovalVersion( PP_RevisionAttr& r );
 
+    UT_uint32 fromChangeID( const char* s );
     UT_uint32 fromChangeID( const std::string s );
     
 protected:

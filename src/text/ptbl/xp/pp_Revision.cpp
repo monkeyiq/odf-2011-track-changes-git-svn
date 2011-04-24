@@ -26,6 +26,8 @@
 
 //#include <limits.h>
 
+#include <sstream>
+
 PP_Revision::PP_Revision(UT_uint32 Id, PP_RevisionType eType, const gchar * props, const gchar * attrs):
 	m_iID(Id), m_eType(eType), m_bDirty(true)
 {
@@ -536,7 +538,8 @@ void PP_RevisionAttr::pruneForCumulativeResult(PD_Document * pDoc)
 	{
 		return;
 	}
-	
+    m_bDirty = true;
+    
 	for(i = m_vRev.getItemCount()-1; i >=0; --i)
 	{
 		PP_Revision * r = (PP_Revision *)m_vRev.getNthItem(i);
@@ -941,6 +944,31 @@ void PP_RevisionAttr::addRevision(UT_uint32 iId, PP_RevisionType eType,
 	m_pLastRevision = NULL;
 }
 
+void
+PP_RevisionAttr::addRevision( const PP_Revision* r )
+{
+    std::stringstream ss;
+    if(r->getType() & PP_REVISION_FMT_CHANGE)
+        ss << "!";
+    
+    ss << (r->getId() * ((r->getType() == PP_REVISION_DELETION)?-1:1));
+
+    if(r->hasProperties())
+    {
+        ss << "{" << r->getPropsString() << "}";
+    }
+    if(r->hasAttributes())
+    {
+        ss << "{" << r->getAttrsString() << "}";
+    }
+
+    PP_RevisionAttr us( getXMLstring() );
+    _clear();
+    std::string tmp = (std::string)us.getXMLstring() + "," + ss.str();
+    setRevision( tmp.c_str() );
+}
+
+
 void PP_RevisionAttr::mergeAll( const PP_RevisionAttr& ra )
 {
     PP_RevisionAttr us( getXMLstring() );
@@ -1136,6 +1164,27 @@ const gchar * PP_RevisionAttr::getXMLstring() const
 
 	return (const gchar*) m_sXMLstring.c_str();
 }
+
+std::string
+PP_RevisionAttr::getXMLstringUpTo( UT_uint32 iId ) const
+{
+    PP_RevisionAttr rat;
+    rat.setRevision( getXMLstring() );
+    UT_DEBUGMSG(("PP_RevisionAttr::getXMLstringUpTo() id:%d before:%s\n", iId, rat.getXMLstring() ));
+    rat.removeAllHigherOrEqualIds( iId );
+    UT_DEBUGMSG(("PP_RevisionAttr::getXMLstringUpTo() id:%d  after:%s\n", iId, rat.getXMLstring() ));
+    // PP_RevisionAttr rat;
+    // const PP_Revision* r = 0;
+    // for( int raIdx = 0;
+    //      raIdx < iId && (r = ra.getNthRevision( raIdx ));
+    //      raIdx++ )
+    // {
+    //     rat.addRevision( r );
+    // }
+    return rat.getXMLstring();
+}
+
+
 
 /*! returns true if the fragment marked by this attribute is
     superfluous, i.e, it was created in the process of the present

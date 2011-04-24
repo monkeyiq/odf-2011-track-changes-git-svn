@@ -82,9 +82,9 @@ ODe_ChangeTrackingACChange::getAttributesToSave()
 
 std::string
 ODe_ChangeTrackingACChange::createACChange( UT_uint32 revision,
-                                        ac_change_t actype,
-                                        const std::string& attr,
-                                        const std::string& oldValue )
+                                            ac_change_t actype,
+                                            const std::string& attr,
+                                            const std::string& oldValue )
 {
     std::stringstream ss;
     
@@ -116,8 +116,8 @@ ODe_ChangeTrackingACChange::createACChange( UT_uint32 revision,
 
 std::string
 ODe_ChangeTrackingACChange::createACChange( UT_uint32 revision,
-                                        ac_change_t actype,
-                                        const std::string& attr )
+                                            ac_change_t actype,
+                                            const std::string& attr )
 {
     std::string d = getDefaultODFValueForAttribute( attr );
     return createACChange( revision, actype, attr, d );
@@ -125,11 +125,12 @@ ODe_ChangeTrackingACChange::createACChange( UT_uint32 revision,
 
 
 std::string
-ODe_ChangeTrackingACChange::createACChange( const std::string& abwRevisionString, UT_uint32 minRevision )
+ODe_ChangeTrackingACChange::createACChange( const std::string& abwRevisionString,
+                                            UT_uint32 minRevision )
 {
     PP_RevisionAttr ra( abwRevisionString.c_str() );
-    UT_DEBUGMSG(("createACChange() revisionsCount:%d revString:%s\n",
-                 ra.getRevisionsCount(), abwRevisionString.c_str() ));
+    UT_DEBUGMSG(("createACChange() revisionsCount:%d revString:%s minRevision:%ld\n",
+                 ra.getRevisionsCount(), abwRevisionString.c_str(), minRevision ));
 
     std::list< const PP_Revision* > revlist;
     const PP_Revision* r = 0;
@@ -144,7 +145,8 @@ ODe_ChangeTrackingACChange::createACChange( const std::string& abwRevisionString
 }
 
 std::string
-ODe_ChangeTrackingACChange::createACChange( const PP_AttrProp* pAPcontainingRevisionString, UT_uint32 minRevision )
+ODe_ChangeTrackingACChange::createACChange( const PP_AttrProp* pAPcontainingRevisionString,
+                                            UT_uint32 minRevision )
 {
     if( const char* revisionString = UT_getAttribute( pAPcontainingRevisionString, "revision", 0 ))
     {
@@ -176,9 +178,19 @@ struct LookupODFStyleFunctor
     {
     }
     
-    std::string operator()( const PP_Revision* pAP, std::string ) const
+    std::string operator()( PP_RevisionAttr& rat, const PP_Revision* pAP, std::string ) const
     {
-        std::string styleName = ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles );
+        std::string styleName;
+        UT_DEBUGMSG(("LookupODFStyleFunctor(top) rev:%d rat:%s\n", pAP->getId(), rat.getXMLstring() ));
+        
+//        styleName = ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles );
+        UT_DEBUGMSG(("LookupODFStyleFunctor(a1) rev:%d styleName:%s rat:%s\n", pAP->getId(), styleName.c_str(), rat.getXMLstring() ));
+
+//        if ( ODe_Style_Style::hasTextStyleProps(pAP) )
+        {
+            styleName = ODe_Style_Style::getTextStyleProps( pAP, rat.getXMLstring(), m_rAutomatiStyles );
+        }
+        UT_DEBUGMSG(("LookupODFStyleFunctor(a) rev:%d rat:%s\n", pAP->getId(), rat.getXMLstring() ));
         UT_DEBUGMSG(("LookupODFStyleFunctor(a) rev:%d stylename:%s\n", pAP->getId(), styleName.c_str() ));
         if( !styleName.empty() )
         {
@@ -197,7 +209,7 @@ ODe_ChangeTrackingACChange::getLookupODFStyleFunctor( ODe_AutomaticStyles& as, O
     return ret;
 }
 
-static std::string UTGetAttrFunctor( const PP_Revision* pAP, std::string attr )
+static std::string UTGetAttrFunctor( PP_RevisionAttr& rat, const PP_Revision* pAP, std::string attr )
 {
     const char* v = UT_getAttribute( pAP, attr.c_str(), 0 );
     std::string ret = v ? v : "";
@@ -216,14 +228,13 @@ ODe_ChangeTrackingACChange::getUTGetAttrFunctor()
 
 
 std::string
-ODe_ChangeTrackingACChange::handleRevAttr( const PP_Revision* r,
-                                           std::map< std::string, const PP_Revision* >& attributesSeen,
+ODe_ChangeTrackingACChange::handleRevAttr( PP_RevisionAttr& rat,
+                                           const PP_Revision* r,
+                                           attributesSeen_t& attributesSeen,
                                            m_attrRead_f f,
                                            std::string attr,
                                            const char* newValue )
 {
-    typedef std::map< std::string, const PP_Revision* > attributesSeen_t;
-
     UT_DEBUGMSG(("ODe_ChangeTrackingACChange::handleRevAttr() r:%d attr:%s newV:%s\n", r->getId(), attr.c_str(), newValue ));
     
     ac_change_t actype = INVALID;
@@ -242,15 +253,19 @@ ODe_ChangeTrackingACChange::handleRevAttr( const PP_Revision* r,
         //
         // Grab the value of the attribute from the previous revision...
         //
-        const PP_Revision* oldr = attributesSeen[ attr ];
-        oldValue = f( oldr, attr );
+        std::pair< const PP_Revision*, std::string > p = attributesSeen[ attr ];
+        const PP_Revision* oldr = p.first;
+        PP_RevisionAttr oldrat;
+        oldrat.setRevision( p.second );
+        
+        oldValue = f( oldrat, oldr, attr );
         // if( const char* v = UT_getAttribute( oldr, attr.c_str(), 0 ))
         // {
         //     oldValue = v;
         // }
     }
                 
-    attributesSeen[ attr ] = r;
+    attributesSeen[ attr ] = std::make_pair( r, rat.getXMLstring() );
 
     if( actype == INVALID )
     {
@@ -335,9 +350,10 @@ ODe_ChangeTrackingACChange::createACChange( std::list< const PP_Revision* > revl
     // previous revision entry for that attribute to pluck off the
     // correct old-value. As such, we use attributesSeen as a cache of
     // the previously seen revision for each attribute.
-    typedef std::map< std::string, const PP_Revision* > attributesSeen_t;
     attributesSeen_t attributesSeen;
-    
+
+
+    PP_RevisionAttr rat;
 
     //
     // through the revisions from start to end.
@@ -346,19 +362,20 @@ ODe_ChangeTrackingACChange::createACChange( std::list< const PP_Revision* > revl
          ri != revlist.end(); ++ri )
     {
         r = *ri;
-        
+        rat.addRevision( r );
+
+        UT_DEBUGMSG(("createACChange() rev:%ld rat:%s\n", r->getId(), rat.getXMLstring() ));
         for( m_attrlookups_t::iterator ai = m_attrlookups.begin(); ai != m_attrlookups.end(); ++ai )
         {
             std::string attr = ai->first;
-            std::string v = ai->second( r, attr );
+            std::string v = ai->second( rat, r, attr );
             if( !v.empty() )
             {
-                std::string str = handleRevAttr( r, attributesSeen, ai->second, attr, v.c_str() );
+                std::string str = handleRevAttr( rat, r, attributesSeen, ai->second, attr, v.c_str() );
                 ss << str;
+                UT_DEBUGMSG(("createACChange() rev:%ld rat:%s v:%s\n", r->getId(), rat.getXMLstring(), str.c_str() ));
             }
         }
-        
-
         
         for( m_attributesToSave_t::iterator ai = m_attributesToSave.begin();
              ai != m_attributesToSave.end(); ++ai )
@@ -366,10 +383,12 @@ ODe_ChangeTrackingACChange::createACChange( std::list< const PP_Revision* > revl
             std::string attr = ai->c_str();
             if( const char* newValue = UT_getAttribute( r, attr.c_str(), 0 ))
             {
-                std::string str = handleRevAttr( r, attributesSeen, getUTGetAttrFunctor(), attr, newValue );
+                std::string str = handleRevAttr( rat, r, attributesSeen, getUTGetAttrFunctor(), attr, newValue );
                 ss << str;
             }
         }
+
+//        rat.addRevision( r );
     }
     
     return ss.str();

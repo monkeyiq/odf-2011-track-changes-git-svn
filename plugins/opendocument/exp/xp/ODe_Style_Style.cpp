@@ -169,17 +169,76 @@ bool ODe_Style_Style::write(GsfOutput* pODT, const UT_UTF8String& rSpacesOffset)
 
 std::string
 ODe_Style_Style::getTextStyleProps( const PP_AttrProp* pAP,
+                                    std::string revString,
+                                    ODe_AutomaticStyles& m_rAutomatiStyles )
+{
+    ODe_Style_Style* pStyle = new ODe_Style_Style();
+    pStyle->setFamily("text");
+    if ( !pStyle->m_pTextProps )
+    {
+        pStyle->m_pTextProps = new TextProps();
+    }
+    UT_DEBUGMSG(("ODe_Style_Style::getTextStyleProps() rat:%s\n", revString.c_str() ));
+
+    //
+    // This is a bit tricky, if there is an explicit abi "style" set in
+    // the current revision (pAP) then we should use that, otherwise we
+    // might have to build one up using the properties in pAP and the revString
+    //
+    bool ok;
+    const gchar* pValue;
+    if (pAP->getAttribute("style", pValue))
+    {
+        //
+        // yay, an explicit style, our work is done
+        //
+        UT_DEBUGMSG(("ODe_Style_Style::getTextStyleProps(1) have an explicit style:%s\n", pValue ));
+        std::string ret = pValue;
+        return ret;
+    }
+
+    bool haveData = false;
+    if ( ODe_Style_Style::hasTextStyleProps( pAP, false ) )
+    {
+        haveData = true;
+        UT_DEBUGMSG(("ODe_Style_Style::getTextStyleProps(2) rat:%s\n", revString.c_str() ));
+        pStyle->m_pTextProps->fetchAttributesFromAbiProps( *pAP );
+        UT_DEBUGMSG(("ODe_Style_Style::getTextStyleProps(2) style:%s\n", pStyle->getName().utf8_str()));
+    }
+    
+    if( !revString.empty() && revString != "1" && revString != "0" )
+    {
+        haveData = true;
+        UT_DEBUGMSG(("ODe_Style_Style::getTextStyleProps(3) rat:%s\n", revString.c_str() ));
+        PP_RevisionAttr ra( revString.c_str() );
+        pStyle->m_pTextProps->fetchAttributesFromAbiProps( ra );
+    }
+
+    if( !haveData )
+    {
+        UT_DEBUGMSG(("ODe_Style_Style::getTextStyleProps(5) no style data found\n" ));
+        return "";
+    }
+    
+
+    m_rAutomatiStyles.storeTextStyle(pStyle);
+    std::string ret = pStyle->getName().utf8_str();
+    return ret;
+}
+
+std::string
+ODe_Style_Style::getTextStyleProps( const PP_AttrProp* pAP,
                                     ODe_AutomaticStyles& m_rAutomatiStyles )
 {
     std::string ret;
 
     if ( ODe_Style_Style::hasTextStyleProps(pAP) )
     {
+        UT_DEBUGMSG(("xx1 has-style-props\n" ));
         // Need to create a new automatic style to hold those paragraph
         // properties.
         
-        ODe_Style_Style* pStyle;
-        pStyle = new ODe_Style_Style();
+        ODe_Style_Style* pStyle = new ODe_Style_Style();
         pStyle->setFamily("text");
         
         pStyle->fetchAttributesFromAbiSpan(pAP);
@@ -193,6 +252,7 @@ ODe_Style_Style::getTextStyleProps( const PP_AttrProp* pAP,
         const gchar* pValue;
         
         ok = pAP->getAttribute("style", pValue);
+        UT_DEBUGMSG(("xx1 no style-props ok:%d\n", ok ));
         UT_DEBUGMSG(("ODe_Text_Listener::openSpan() no style-props, ok:%d\n", ok ));
         if (ok)
         {
@@ -210,13 +270,14 @@ ODe_Style_Style::getTextStyleProps( const PP_AttrProp* pAP,
  * Returns true if the specified PP_AttrProp contains properties that belongs to
  * <style:text-properties> elements
  */
-bool ODe_Style_Style::hasTextStyleProps(const PP_AttrProp* pAP)
+bool ODe_Style_Style::hasTextStyleProps( const PP_AttrProp* pAP, bool checkRevisionAttr )
 {
     
     const gchar* pValue;
     bool ok;
 
-    UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps() has rev:%d\n", pAP->getAttribute("revision", pValue) ));
+    UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps() checkRevisionAttr:%d has rev:%d\n",
+                 checkRevisionAttr, pAP->getAttribute("revision", pValue) ));
     
     ok = pAP->getProperty("color", pValue);
     if (ok && pValue != NULL) {
@@ -273,19 +334,22 @@ bool ODe_Style_Style::hasTextStyleProps(const PP_AttrProp* pAP)
         return true;
     }
 
-    ok = pAP->getAttribute("revision", pValue);
-    UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps rev-ok:%d\n", ok ));
-    if (ok && pValue)
+    if( checkRevisionAttr )
     {
-        UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps rev:%s\n", pValue ));
-        PP_RevisionAttr ra( pValue );
-        const PP_Revision* r = 0;
-        for( int raIdx = ra.getRevisionsCount()-1;
-             raIdx >= 0 && (r = ra.getNthRevision( raIdx ));
-             --raIdx )
+        ok = pAP->getAttribute("revision", pValue);
+        UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps rev-ok:%d\n", ok ));
+        if (ok && pValue)
         {
-            if( ODe_Style_Style::hasTextStyleProps( r ) )
-                return true;
+            UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps rev:%s\n", pValue ));
+            PP_RevisionAttr ra( pValue );
+            const PP_Revision* r = 0;
+            for( int raIdx = ra.getRevisionsCount()-1;
+                 raIdx >= 0 && (r = ra.getNthRevision( raIdx ));
+                 --raIdx )
+            {
+                if( ODe_Style_Style::hasTextStyleProps( r ) )
+                    return true;
+            }
         }
     }
     
@@ -1719,12 +1783,28 @@ bool ODe_Style_Style::TextProps::isEmpty() const {
            m_transform.empty();
 }
 
+void
+ODe_Style_Style::TextProps::fetchAttributesFromAbiProps(PP_RevisionAttr& ra)
+{
+    ra.pruneForCumulativeResult( 0 );
+    UT_DEBUGMSG(("ODe_Style_Style::fetchAttributesFromAbiProps xx1 pruned rev:%s\n", ra.getXMLstring() ));
+    const PP_Revision* r = 0;
+    // for( int raIdx = ra.getRevisionsCount()-1;
+    //      raIdx >= 0 && (r = ra.getNthRevision( raIdx ));
+    //      --raIdx )
+    for( UT_uint32 raIdx = 0;
+         raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
+         raIdx++ )
+    {
+        ODe_Style_Style::TextProps::fetchAttributesFromAbiProps( *r );
+    }
+}
+
 
 /**
  * 
  */
-void ODe_Style_Style::TextProps::
-fetchAttributesFromAbiProps(const PP_AttrProp& rAP) {
+void ODe_Style_Style::TextProps::fetchAttributesFromAbiProps(const PP_AttrProp& rAP) {
     const gchar* pValue;
     bool ok;
     
@@ -1752,7 +1832,9 @@ fetchAttributesFromAbiProps(const PP_AttrProp& rAP) {
         } else if (!strcmp("superscript", pValue)) {
             // Hard coded, it's ugly but I can't do otherwise.
             m_textPosition = "33%";
-        } else {
+        }
+        else
+        {
             UT_ASSERT( !strcmp("normal", pValue) );
             m_textPosition.clear();
         }
@@ -1849,19 +1931,12 @@ fetchAttributesFromAbiProps(const PP_AttrProp& rAP) {
     // FIXME: we should only fetch the properties of the last setting of each
     // style attribute, is pruneForCumulativeResult() right?
     ok = rAP.getAttribute("revision", pValue);
-    UT_DEBUGMSG(("ODe_Style_Style::fetchAttributesFromAbiProps rev-ok:%d\n", ok ));
+    UT_DEBUGMSG(("ODe_Style_Style::fetchAttributesFromAbiProps xx1 rev-ok:%d\n", ok ));
     if (ok && pValue)
     {
-        UT_DEBUGMSG(("ODe_Style_Style::fetchAttributesFromAbiProps rev:%s\n", pValue ));
+        UT_DEBUGMSG(("ODe_Style_Style::fetchAttributesFromAbiProps xx1 rev:%s\n", pValue ));
         PP_RevisionAttr ra( pValue );
-        ra.pruneForCumulativeResult( 0 );
-        const PP_Revision* r = 0;
-        for( int raIdx = ra.getRevisionsCount()-1;
-             raIdx >= 0 && (r = ra.getNthRevision( raIdx ));
-             --raIdx )
-        {
-            ODe_Style_Style::TextProps::fetchAttributesFromAbiProps( *r );
-        }
+        fetchAttributesFromAbiProps( ra );
     }
     
 }

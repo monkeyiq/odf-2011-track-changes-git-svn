@@ -140,6 +140,9 @@ class ABI_EXPORT PP_RevisionAttr
 									  const gchar ** pAttrs,
 									  const gchar ** pProps);
 
+    // No ownership of the given revision is taken. 
+    void                  addRevision( const PP_Revision* r );
+
 	bool                  changeRevisionType(UT_uint32 iId, PP_RevisionType eType);
 	bool                  changeRevisionId(UT_uint32 iOldId, UT_uint32 iNewId);
 
@@ -178,12 +181,14 @@ class ABI_EXPORT PP_RevisionAttr
 	const UT_Vector *     getProps();
 #endif
 	const gchar *      getXMLstring() const;
+    std::string        getXMLstringUpTo( UT_uint32 iId ) const;
+    
 	void                  forceDirty() {m_bDirty = true;}
 	bool                  isFragmentSuperfluous() const;
 
 	bool operator== (const PP_RevisionAttr &op2) const;
 
-    // MIQ: This would be nice, but there are ownership issues I don't know about with Memory
+    // MIQ: This would be nice, but there are ownership issues I don't know about with M
 //    PP_RevisionAttr& operator=(const PP_RevisionAttr &rhs);
     
     void mergeAll( const PP_RevisionAttr& ra );

@@ -37,6 +37,7 @@
 class PP_AttrProp;
 class ODe_Style_List;
 class ODe_AutomaticStyles;
+class PP_RevisionAttr;
 
 /**
  * Class representing an OpenDocument <style:style> element.
@@ -50,11 +51,12 @@ public:
     // Write the <style:style> element.
     bool write(GsfOutput* pODT, const UT_UTF8String& rSpacesOffset) const;
     
-    static bool hasTextStyleProps(const PP_AttrProp* pAP);
+    static bool hasTextStyleProps(const PP_AttrProp* pAP, bool checkRevisionAttr = true );
     static bool hasParagraphStyleProps(const PP_AttrProp* pAP);
     static bool hasSectionInfo(const PP_AttrProp* pAP);
     static bool hasTableStyleProps(const PP_AttrProp* pAP);    
-    static std::string getTextStyleProps(const PP_AttrProp* pAP, ODe_AutomaticStyles& m_rAutomatiStyles );
+    static std::string getTextStyleProps( const PP_AttrProp* pAP, ODe_AutomaticStyles& m_rAutomatiStyles );
+    static std::string getTextStyleProps( const PP_AttrProp* pAP, std::string revString, ODe_AutomaticStyles& m_rAutomatiStyles );
 
     // It does not take style names into consideration.
     // Read it like: "is style "T1" equivalent to style "T2"
@@ -247,6 +249,7 @@ private:
         
         bool isEmpty() const;
         void fetchAttributesFromAbiProps(const PP_AttrProp& rAP);
+        void fetchAttributesFromAbiProps(PP_RevisionAttr& ra);        
         void write(UT_UTF8String& rOutput, const UT_UTF8String& rSpacesOffset) const ;
         TextProps& operator=(const TextProps& rTextProps);
         bool operator==(const TextProps& rTextProps) const;

@@ -130,7 +130,7 @@ class ODe_ChangeTrackingACChange
      * It might be handy to add getXXXFunctor() calls to this class so that
      * all code can easily get such attributes. text:style-name is already added here.
      */
-    typedef boost::function< std::string ( const PP_Revision*, std::string ) > m_attrRead_f;
+    typedef boost::function< std::string ( PP_RevisionAttr& rat, const PP_Revision*, std::string ) > m_attrRead_f;
     typedef std::map< std::string, m_attrRead_f > m_attrlookups_t;
     void setAttributeLookupFunction( const std::string& n, m_attrRead_f f );
     void clearAttributeLookupFunctions();
@@ -186,11 +186,14 @@ class ODe_ChangeTrackingACChange
 
   private:
 
+    typedef std::map< std::string, std::pair< const PP_Revision*, std::string > > attributesSeen_t;
+
     /**
      * Used by createACChange() to write out an explicit revision.
      */
-    std::string handleRevAttr( const PP_Revision* r,
-                               std::map< std::string, const PP_Revision* >& attributesSeen,
+    std::string handleRevAttr( PP_RevisionAttr& rat,
+                               const PP_Revision* r,
+                               attributesSeen_t& attributesSeen,
                                m_attrRead_f f,
                                std::string attr,
                                const char* newValue );

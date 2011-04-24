@@ -215,6 +215,333 @@ ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH( const g
 }
 
 
+template< class Col, class OutputIterator >
+OutputIterator parseSeparatedList( const std::string& s,
+                                   Col& c,
+                                   OutputIterator out,
+                                   const char sepchar = ';' )
+{
+    std::string tmp;
+    std::stringstream ss( s );
+    while( std::getline( ss, tmp, sepchar ))
+    {
+        if( !tmp.empty() )
+        {
+            UT_DEBUGMSG(("tmp:%s\n", tmp.c_str() ));
+            typename Col::value_type r;
+            std::stringstream data;
+            data << tmp;
+            data >> std::noskipws >> r;
+            
+            *++out = r;
+        }
+    }
+    
+    return out;
+}
+
+template<>
+std::insert_iterator< std::set< std::string > >
+parseSeparatedList< std::set< std::string > ,
+                   std::insert_iterator< std::set< std::string > > >
+( const std::string& s,
+   std::set< std::string > & c,
+  std::insert_iterator< std::set< std::string > > out,
+  const char sepchar )
+{
+    std::string tmp;
+
+    std::stringstream ss(s);
+    while( std::getline( ss, tmp, sepchar ))
+        if( !tmp.empty() )
+        {
+            *++out = tmp;
+        }
+
+    return out;
+}
+
+template< class Col >
+void parseSeparatedList( const std::string& s,
+                         Col& c,
+                         const char sepchar = ';' )
+{
+    parseSeparatedList( s, c, inserter( c, c.end() ), sepchar );
+}
+
+
+        static void
+        ParseKeyValueStringPair( const std::string& kv,
+                                 std::map< std::string, std::string >& m )
+        {
+            std::string k,v;
+            std::stringstream ss;
+            ss << kv;
+            std::getline( ss, k, ':' );
+            std::getline( ss, v );
+            if( !k.empty() )
+                m.insert( std::make_pair( k, v ));
+        }
+
+
+        std::map< std::string, std::string >&
+        ParseKeyValueString( std::map< std::string, std::string >& ret,
+                             const std::string& kvs,
+                             const std::string& seps )
+        {
+            std::string::const_iterator b = kvs.begin();
+            std::string::const_iterator e = kvs.end();
+            std::set< char > seps_set;
+            std::copy( seps.begin(), seps.end(), std::inserter( seps_set, seps_set.begin() ));
+            
+            for( ;; )
+            {
+                std::string kv;
+
+                // make sure that there is an embedded ':' for the key/value
+                // split. This also allows any of the seperators to appear
+                // in the key and parsing to work as expected.
+                while( b!=e )
+                {
+                    /* Copy kv pair from string */
+                    int oldkvlen = kv.length();
+                    
+                    std::copy( b,
+                               std::find_first_of( b, e,
+                                                   seps.begin(), seps.end(),
+                                                   std::equal_to<char>() ),
+                               std::back_insert_iterator< std::string >(kv) );
+                    b += ( kv.length() - oldkvlen );
+
+                    if( b==e || kv.find(':') != std::string::npos )
+                        break;
+
+                    kv.push_back( *b );
+                    ++b;
+                }
+                
+                /* Advance past seperators */
+                while( seps_set.find( *b ) != seps_set.end() && b != e )
+                    ++b;
+
+                ParseKeyValueStringPair( kv, ret );
+
+                /* Are we there yet? */
+                if( b == e )
+                    break;
+            }
+            return ret;
+        }
+
+
+std::string replace_all( const std::string& s,
+                         const std::string& olds,
+                         const std::string& news )
+{
+    std::string ret = s;
+    int olds_length = olds.length();
+    int news_length = news.length();
+            
+    int start = ret.find( olds );
+    while( start != std::string::npos )
+    {
+        ret.replace( start, olds_length, news );
+        start = ret.find( olds, start + news_length );
+    }
+    return ret;
+}
+
+static bool  starts_with( const std::string& s, const std::string& starting )
+{
+    int starting_len = starting.length();
+    int s_len = s.length();
+
+    if( s_len < starting_len )
+        return false;
+    
+    return !s.compare( 0, starting_len, starting );
+}
+
+
+std::string getDefaultStyle( std::string s )
+{
+    if( starts_with( s, "font-style" ))
+        return "font-style:normal";
+    if( starts_with( s, "text-decoration" ))
+        return "text-decoration:none";
+    return s;
+}
+
+void
+ODi_TextContent_ListenerState::ctSimplifyStyles( PP_RevisionAttr& ra )
+{
+    UT_DEBUGMSG(("ctSimplifyStyles(top) ra.count:%d\n", ra.getRevisionsCount() ));
+
+    std::stringstream rass;
+    const PP_Revision* r = 0;
+    for( int raIdx = 0;
+         raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
+         raIdx++ )
+    {
+        UT_DEBUGMSG(("ctSimplifyStyles(loop)   id:%d\n", r->getId() ));
+
+        if( !raIdx )
+        {
+            rass << "!" << r->getId() << "{" << r->getPropsString() << "}{" << r->getAttrsString() << "}";
+            continue;
+        }
+        
+        const PP_Revision* prev = ra.getNthRevision( raIdx-1 );
+        UT_DEBUGMSG(("ctSimplifyStyles(   r)   ra:%s\n", r->getPropsString() ));
+        UT_DEBUGMSG(("ctSimplifyStyles(prev)   ra:%s\n", prev->getPropsString() ));
+
+        std::string s = ctSimplifyFromTwoAdjacentStyles( r, prev );
+        UT_DEBUGMSG(("ctSimplifyStyles(   s)     :%s\n", s.c_str() ));
+
+        rass << ",!" << r->getId() << "{" << s << "}{" << r->getAttrsString() << "}";
+        
+//        std::string uptoCurrent = ra.getXMLstringUpTo( r->getId() );
+//        PP_RevisionAttr prev;
+//        prev.setRevision( uptoCurrent.c_str() );
+        // UT_DEBUGMSG(("ctSimplifyStyles(prev)   ra:%s\n", uptoCurrent.c_str() ));
+        
+        // prev.pruneForCumulativeResult( 0 );
+        // UT_DEBUGMSG(("ctSimplifyStyles(pruned) ra:%s\n", prev.getXMLstring() ));
+        
+        //ctSimplifyStyle( r, prev );
+    }
+
+    
+    UT_DEBUGMSG(("ctSimplifyStyles(end old) %s\n", ra.getXMLstring() ));
+    UT_DEBUGMSG(("ctSimplifyStyles(end new) %s\n", rass.str().c_str() ));
+    ra.setRevision( rass.str().c_str() );
+}
+
+
+
+std::string
+ODi_TextContent_ListenerState::ctSimplifyFromTwoAdjacentStyles( const PP_Revision * r, const PP_Revision * p )
+{
+    typedef std::set< std::string > stringset_t;
+    stringset_t current;
+    stringset_t prev;
+    stringset_t intersect;
+    parseSeparatedList( replace_all( r->getPropsString(), ": ", ":" ), current );
+    parseSeparatedList( replace_all( p->getPropsString(), ": ", ":" ), prev );
+
+    UT_DEBUGMSG(("ctSimplifyStyle() current.sz:%d\n", (int)current.size() ));
+    for( stringset_t::iterator iter = current.begin(); iter != current.end(); ++iter )
+        UT_DEBUGMSG(("ctSimplifyStyle() c.v:%s\n", iter->c_str() ));
+    UT_DEBUGMSG(("ctSimplifyStyle() prev.sz:%d\n", (int)prev.size() ));
+    for( stringset_t::iterator iter = prev.begin(); iter != prev.end(); ++iter )
+        UT_DEBUGMSG(("ctSimplifyStyle() p.v:%s\n", iter->c_str() ));
+        
+    std::set_intersection( current.begin(), current.end(),
+                           prev.begin(),    prev.end(),
+                           std::inserter( intersect, intersect.end() ));
+    for( stringset_t::iterator iter = intersect.begin(); iter != intersect.end(); ++iter )
+        current.erase( *iter );
+    for( stringset_t::iterator iter = intersect.begin(); iter != intersect.end(); ++iter )
+        prev.erase( *iter );
+
+    std::stringstream ss;
+    for( stringset_t::iterator iter = prev.begin(); iter != prev.end(); ++iter )
+        ss << getDefaultStyle( *iter ) << ";";
+    for( stringset_t::iterator iter = current.begin(); iter != current.end(); ++iter )
+        ss << *iter << ";";
+//        ss << "PREV:1" << ";";
+
+    return ss.str();
+}
+
+
+
+ODi_TextContent_ListenerState::spanStyle
+ODi_TextContent_ListenerState::ctSimplifyStyle( const ODi_Style_Style* pBloatedStyle,
+                                                PP_RevisionAttr& complexRA,
+                                                UT_uint32 rev,
+                                                PP_RevisionType rt )
+{
+    // FIXME: This is old code, use the other methods which operate on a whole fully loaded ra
+
+
+
+
+    
+//     UT_DEBUGMSG(("ctSimplifyStyle(ra) bloated-is-auto:%d\n", pBloatedStyle->isAutomatic() ));
+    
+//     if ( !pBloatedStyle->isAutomatic() )
+//     {
+//         return spanStyle( pBloatedStyle, rev, rt );
+//     }
+
+//     UT_UTF8String stprops;
+//     UT_UTF8String raprops;
+
+//     pBloatedStyle->getAbiPropsAttrString(stprops);
+//     UT_DEBUGMSG(("ctSimplifyStyle(ra) stprops:%s\n", stprops.utf8_str() ));
+    
+//     const ODi_Style_Style* pStyle = pBloatedStyle;
+        
+//     PP_RevisionAttr ra;
+//     ra.setRevision( complexRA.getXMLstring() );
+//     ra.pruneForCumulativeResult(0);
+//     UT_DEBUGMSG(("ctSimplifyStyle(ra) cra:%s\n", complexRA.getXMLstring() ));
+//     UT_DEBUGMSG(("ctSimplifyStyle(ra)  ra:%s\n", ra.getXMLstring() ));
+
+
+
+// //    if( const PP_Revision * r = ra.getLastRevision())
+//     if( const PP_Revision * r = ra.getNthRevision(0))
+//     {
+//         UT_DEBUGMSG(("ctSimplifyStyle(ra) lrn:%ld\n", r->getId() ));
+//         UT_DEBUGMSG(("ctSimplifyStyle(ra) lra:%s\n", r->getAttrsString() ));
+//         UT_DEBUGMSG(("ctSimplifyStyle(ra) lrp:%s\n", r->getPropsString() ));
+
+//         typedef std::set< std::string > stringset_t;
+//         stringset_t current;
+//         stringset_t prev;
+//         stringset_t intersect;
+//         std::string currentstr = stprops.utf8_str();
+//         parseSeparatedList( replace_all( currentstr,          ": ", ":" ), current );
+//         parseSeparatedList( replace_all( r->getPropsString(), ": ", ":" ), prev );
+
+//         UT_DEBUGMSG(("ctSimplifyStyle() current.sz:%d\n", (int)current.size() ));
+//         for( stringset_t::iterator iter = current.begin(); iter != current.end(); ++iter )
+//             UT_DEBUGMSG(("ctSimplifyStyle() c.v:%s\n", iter->c_str() ));
+//         UT_DEBUGMSG(("ctSimplifyStyle() prev.sz:%d\n", (int)prev.size() ));
+//         for( stringset_t::iterator iter = prev.begin(); iter != prev.end(); ++iter )
+//             UT_DEBUGMSG(("ctSimplifyStyle() p.v:%s\n", iter->c_str() ));
+        
+//         std::set_intersection( current.begin(), current.end(),
+//                                prev.begin(),    prev.end(),
+//                                std::inserter( intersect, intersect.end() ));
+//         for( stringset_t::iterator iter = intersect.begin(); iter != intersect.end(); ++iter )
+//             current.erase( *iter );
+//         for( stringset_t::iterator iter = intersect.begin(); iter != intersect.end(); ++iter )
+//             prev.erase( *iter );
+
+//         std::stringstream ss;
+//         for( stringset_t::iterator iter = current.begin(); iter != current.end(); ++iter )
+//             ss << *iter << ";";
+// //        ss << "PREV:1" << ";";
+//         for( stringset_t::iterator iter = prev.begin(); iter != prev.end(); ++iter )
+//             ss << getDefaultStyle( *iter ) << ";";
+
+//         UT_DEBUGMSG(("ctSimplifyStyle() merged:%s\n", ss.str().c_str() ));
+
+//         spanStyle z;
+//         z.m_rev = rev;
+//         z.m_attr = "props";
+//         z.m_prop = ss.str();
+//         z.m_type = rt;
+//         return z;
+//     }
+        
+//     return spanStyle( pBloatedStyle, rev, rt );
+}
+
+
 /**
  * Called when the XML parser finds a start element tag.
  * 
@@ -748,6 +1075,8 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                     // changes in it, we have to translate the ODF text:style-name into abi props
                     // from this intermediate ra during the load...
                     ctAddACChangeODFTextStyle( ra, ppAtts, ODi_Office_Styles::StyleText );
+
+                    
                     // {
                     //     PP_RevisionAttr x;
                     //     ODi_ChangeTrackingACChange ct( this );
@@ -776,8 +1105,17 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                     if( pStyle )
                     {
                         UT_DEBUGMSG(("openspan(2) adding span-style:%s\n", pStyleName ));
+                        UT_DEBUGMSG(("openspan(2) before:%s\n", ra.getXMLstring() ));
+
+                        {
+                            //spanStyle z = ctSimplifyStyle( pStyle, ra, cid, PP_REVISION_FMT_CHANGE );
+                            //     z.addRevision( ra );
+                        }
+                        
                         spanStyle z( pStyle, cid, PP_REVISION_FMT_CHANGE );
                         z.addRevision( ra );
+
+                        UT_DEBUGMSG(("openspan(2) after:%s\n", ra.getXMLstring() ));
                     }
                     else
                     {
@@ -788,7 +1126,8 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                         z.m_rev = cid;
                         z.addRevision( ra );
                     }
-                    
+
+                    ctSimplifyStyles( ra );
 
                     // Do this at any rate so that the closing span can blindly pop it back
                     m_ctSpanStack.push_back( ra.getXMLstring() );
@@ -3144,10 +3483,8 @@ ODi_TextContent_ListenerState::ctGetACChange( const gchar** ppAtts )
     return ret;
 }
 
-
-ODi_TextContent_ListenerState::spanStyle::spanStyle( const ODi_Style_Style* pStyle, UT_uint32 rev, PP_RevisionType rt )
-    : m_rev( rev )
-    , m_type( rt )
+void
+ODi_TextContent_ListenerState::spanStyle::init( const ODi_Style_Style* pStyle )
 {
     if (pStyle)
     {
@@ -3172,8 +3509,16 @@ ODi_TextContent_ListenerState::spanStyle::spanStyle( const ODi_Style_Style* pSty
             m_prop = pStyle->getDisplayName().utf8_str();
         }
     }
-    
 }
+
+
+ODi_TextContent_ListenerState::spanStyle::spanStyle( const ODi_Style_Style* pStyle, UT_uint32 rev, PP_RevisionType rt )
+    : m_rev( rev )
+    , m_type( rt )
+{
+    init( pStyle );
+}
+
 
 const gchar**
 ODi_TextContent_ListenerState::spanStyle::set( const gchar** ppAtts )
