@@ -1107,9 +1107,12 @@ void ODe_Text_Listener::openTOC(const PP_AttrProp* pAP) {
     // determine the contents of the TOC heading
     UT_UTF8String tocHeading;
     ok = pAP->getProperty("toc-heading", pValue);
-    if (ok && pValue) {
+    if (ok && pValue)
+    {
         tocHeading = pValue;
-    } else {
+    }
+    else
+    {
         tocHeading = fl_TOCLayout::getDefaultHeading();
     }
 
@@ -2100,7 +2103,9 @@ ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
             
         }
 
-        UT_DEBUGMSG(("parax idref:%ld revlist.empty():%d\n", paragraphIdRef, revlist.empty() ));
+        UT_DEBUGMSG(("parax idref:%ld revlist.empty():%d ctHighestRemoveLeavingContentStartRevision:%d\n",
+                     paragraphIdRef, revlist.empty(),
+                     ctHighestRemoveLeavingContentStartRevision ));
         const char* xmlid = 0;
         if( pAP->getAttribute( PT_XMLID, xmlid ) && xmlid )
         {
@@ -2353,6 +2358,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
             }
             
             UT_DEBUGMSG(("ODTCT change of text:p/h revisionStack.sz:%d\n", (int)revisionStack.size() ));
+            UT_DEBUGMSG(("ODTCT rev:%d\n", r->getId() ));
             ctHighestRemoveLeavingContentStartRevision = r->getId();
             _openODParagraphToBuffer( r, o,
                                       r->getId(),

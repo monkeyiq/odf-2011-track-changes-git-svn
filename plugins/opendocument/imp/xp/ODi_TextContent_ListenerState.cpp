@@ -200,7 +200,6 @@ ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH( const g
         UT_DEBUGMSG(("text:x2 style:%s\n", styleName.c_str() ));
 
         ctAddACChangeODFTextStyle( m_ctLeadingElementChangedRevision, ppAtts, ODi_Office_Styles::StylePara );
-//        ctAddACChange( m_ctLeadingElementChangedRevision, ppAtts );
         
         const gchar ** pProps = 0;
         propertyArray<> ppAtts;
@@ -363,12 +362,55 @@ static bool  starts_with( const std::string& s, const std::string& starting )
 }
 
 
-std::string getDefaultStyle( std::string s )
+#include "pd_Style.h"
+std::string getDefaultStyle( PD_Document* pDoc, std::string s )
 {
+    std::string key = s.substr( 0, s.find(":"));
+    UT_DEBUGMSG(("getDefaultStyle() doc:%p s:%s key:%s\n", pDoc, s.c_str(), key.c_str() ));
+
+    
+    const char * pDefaultStyleName = pDoc->getDefaultStyle();
+    PD_Style*    pStyle  = 0;
+    pDoc->getStyle( "Normal", &pStyle );
+    if( pStyle )
+    {
+        bool ok = false;
+        const gchar* szValue = 0;
+//        const char * pStyleName = PD_Document::getDefaultStyle();
+        ok = pStyle->getProperty( key.c_str(), szValue );
+        UT_DEBUGMSG(("getDefaultStyle() pc:%d\n", pStyle->getPropertyCount() ));
+        UT_DEBUGMSG(("getDefaultStyle() ac:%d\n", pStyle->getAttributeCount() ));
+        UT_DEBUGMSG(("getDefaultStyle() ok:%d\n", ok ));
+
+        if( ok )
+        {
+            UT_DEBUGMSG(("getDefaultStyle() have default value from default style!\n" ));
+            UT_DEBUGMSG(("getDefaultStyle() szv:%s\n", szValue ));
+            return key + ":" + szValue;
+        }
+        
+        for( int i=0; i < pStyle->getPropertyCount(); ++i )
+        {
+            const gchar * szName = 0;
+        	ok = pStyle->getNthProperty( i, szName, szValue );
+            UT_DEBUGMSG(("getDefaultStyle() i:%d ok:%d\n",  i, ok ));
+            if( ok )
+            {
+                UT_DEBUGMSG(("getDefaultStyle() i:%d szn:%s\n", i, szName ));
+                UT_DEBUGMSG(("getDefaultStyle() i:%d szv:%s\n", i, szValue ));
+            }
+        }
+    }
+
+    UT_DEBUGMSG(("getDefaultStyle(falling back to hand written defaults) doc:%p s:%s key:%s\n",
+                 pDoc, s.c_str(), key.c_str() ));
+    
     if( starts_with( s, "font-style" ))
         return "font-style:normal";
     if( starts_with( s, "text-decoration" ))
         return "text-decoration:none";
+
+    UT_DEBUGMSG(("getDefaultStyle(NO DEFAULT) doc:%p s:%s key:%s\n", pDoc, s.c_str(), key.c_str() ));
     return s;
 }
 
@@ -446,100 +488,14 @@ ODi_TextContent_ListenerState::ctSimplifyFromTwoAdjacentStyles( const PP_Revisio
 
     std::stringstream ss;
     for( stringset_t::iterator iter = prev.begin(); iter != prev.end(); ++iter )
-        ss << getDefaultStyle( *iter ) << ";";
+        ss << getDefaultStyle( m_pAbiDocument, *iter ) << ";";
     for( stringset_t::iterator iter = current.begin(); iter != current.end(); ++iter )
         ss << *iter << ";";
-//        ss << "PREV:1" << ";";
 
     return ss.str();
 }
 
 
-
-ODi_TextContent_ListenerState::spanStyle
-ODi_TextContent_ListenerState::ctSimplifyStyle( const ODi_Style_Style* pBloatedStyle,
-                                                PP_RevisionAttr& complexRA,
-                                                UT_uint32 rev,
-                                                PP_RevisionType rt )
-{
-    // FIXME: This is old code, use the other methods which operate on a whole fully loaded ra
-
-
-
-
-    
-//     UT_DEBUGMSG(("ctSimplifyStyle(ra) bloated-is-auto:%d\n", pBloatedStyle->isAutomatic() ));
-    
-//     if ( !pBloatedStyle->isAutomatic() )
-//     {
-//         return spanStyle( pBloatedStyle, rev, rt );
-//     }
-
-//     UT_UTF8String stprops;
-//     UT_UTF8String raprops;
-
-//     pBloatedStyle->getAbiPropsAttrString(stprops);
-//     UT_DEBUGMSG(("ctSimplifyStyle(ra) stprops:%s\n", stprops.utf8_str() ));
-    
-//     const ODi_Style_Style* pStyle = pBloatedStyle;
-        
-//     PP_RevisionAttr ra;
-//     ra.setRevision( complexRA.getXMLstring() );
-//     ra.pruneForCumulativeResult(0);
-//     UT_DEBUGMSG(("ctSimplifyStyle(ra) cra:%s\n", complexRA.getXMLstring() ));
-//     UT_DEBUGMSG(("ctSimplifyStyle(ra)  ra:%s\n", ra.getXMLstring() ));
-
-
-
-// //    if( const PP_Revision * r = ra.getLastRevision())
-//     if( const PP_Revision * r = ra.getNthRevision(0))
-//     {
-//         UT_DEBUGMSG(("ctSimplifyStyle(ra) lrn:%ld\n", r->getId() ));
-//         UT_DEBUGMSG(("ctSimplifyStyle(ra) lra:%s\n", r->getAttrsString() ));
-//         UT_DEBUGMSG(("ctSimplifyStyle(ra) lrp:%s\n", r->getPropsString() ));
-
-//         typedef std::set< std::string > stringset_t;
-//         stringset_t current;
-//         stringset_t prev;
-//         stringset_t intersect;
-//         std::string currentstr = stprops.utf8_str();
-//         parseSeparatedList( replace_all( currentstr,          ": ", ":" ), current );
-//         parseSeparatedList( replace_all( r->getPropsString(), ": ", ":" ), prev );
-
-//         UT_DEBUGMSG(("ctSimplifyStyle() current.sz:%d\n", (int)current.size() ));
-//         for( stringset_t::iterator iter = current.begin(); iter != current.end(); ++iter )
-//             UT_DEBUGMSG(("ctSimplifyStyle() c.v:%s\n", iter->c_str() ));
-//         UT_DEBUGMSG(("ctSimplifyStyle() prev.sz:%d\n", (int)prev.size() ));
-//         for( stringset_t::iterator iter = prev.begin(); iter != prev.end(); ++iter )
-//             UT_DEBUGMSG(("ctSimplifyStyle() p.v:%s\n", iter->c_str() ));
-        
-//         std::set_intersection( current.begin(), current.end(),
-//                                prev.begin(),    prev.end(),
-//                                std::inserter( intersect, intersect.end() ));
-//         for( stringset_t::iterator iter = intersect.begin(); iter != intersect.end(); ++iter )
-//             current.erase( *iter );
-//         for( stringset_t::iterator iter = intersect.begin(); iter != intersect.end(); ++iter )
-//             prev.erase( *iter );
-
-//         std::stringstream ss;
-//         for( stringset_t::iterator iter = current.begin(); iter != current.end(); ++iter )
-//             ss << *iter << ";";
-// //        ss << "PREV:1" << ";";
-//         for( stringset_t::iterator iter = prev.begin(); iter != prev.end(); ++iter )
-//             ss << getDefaultStyle( *iter ) << ";";
-
-//         UT_DEBUGMSG(("ctSimplifyStyle() merged:%s\n", ss.str().c_str() ));
-
-//         spanStyle z;
-//         z.m_rev = rev;
-//         z.m_attr = "props";
-//         z.m_prop = ss.str();
-//         z.m_type = rt;
-//         return z;
-//     }
-        
-//     return spanStyle( pBloatedStyle, rev, rt );
-}
 
 
 /**
@@ -1063,38 +1019,11 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                 {
                     UT_DEBUGMSG(("openspan(style top) spanstack.size:%d\n", m_ctSpanStack.size() ));
 
-                    // FIXME: m_ctSpanStack needs to record many styles for a single "span" due
-                    // to ac:change attributes
-                    // PP_RevisionAttr ra;
-                    // ctAddACChange( ra, ppAtts );
-
-
                     PP_RevisionAttr ra;
-
                     // The revision attribute x will have a series of {version,odt-attr} style
                     // changes in it, we have to translate the ODF text:style-name into abi props
                     // from this intermediate ra during the load...
                     ctAddACChangeODFTextStyle( ra, ppAtts, ODi_Office_Styles::StyleText );
-
-                    
-                    // {
-                    //     PP_RevisionAttr x;
-                    //     ODi_ChangeTrackingACChange ct( this );
-
-                    //     ct.ctAddACChange( x, ppAtts );
-                    //     UT_DEBUGMSG(("openspan(acchange) x.sz:%d\n", x.getRevisionsCount() ));
-                    //     const PP_Revision* r = 0;
-                    //     for( int raIdx = 0;
-                    //          raIdx < x.getRevisionsCount() && (r = x.getNthRevision( raIdx ));
-                    //          raIdx++ )
-                    //     {
-                    //         const gchar*       pStyleName = UT_getAttribute( r, "text:style-name", 0 );
-                    //         const ODi_Style_Style* pStyle = m_pStyles->getTextStyle( pStyleName, m_bOnContentStream );
-                    //         UT_DEBUGMSG(("openspan(acchange) rev:%d style:%s\n", r->getId(), pStyleName ));
-                    //         spanStyle z( pStyle, r->getId(), PP_REVISION_FMT_CHANGE );
-                    //         z.addRevision( ra );
-                    //     }
-                    // }
 
                     UT_DEBUGMSG(("openspan(acchange done) ra:%s\n", ra.getXMLstring() ));
                     UT_DEBUGMSG(("openspan(2) span-style:%s\n", pStyleName ));
@@ -1107,11 +1036,6 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                         UT_DEBUGMSG(("openspan(2) adding span-style:%s\n", pStyleName ));
                         UT_DEBUGMSG(("openspan(2) before:%s\n", ra.getXMLstring() ));
 
-                        {
-                            //spanStyle z = ctSimplifyStyle( pStyle, ra, cid, PP_REVISION_FMT_CHANGE );
-                            //     z.addRevision( ra );
-                        }
-                        
                         spanStyle z( pStyle, cid, PP_REVISION_FMT_CHANGE );
                         z.addRevision( ra );
 

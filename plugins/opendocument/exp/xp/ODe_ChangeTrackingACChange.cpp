@@ -183,7 +183,7 @@ struct LookupODFStyleFunctor
         std::string styleName;
         UT_DEBUGMSG(("LookupODFStyleFunctor(top) rev:%d rat:%s\n", pAP->getId(), rat.getXMLstring() ));
         
-//        styleName = ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles );
+        styleName = ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles );
         UT_DEBUGMSG(("LookupODFStyleFunctor(a1) rev:%d styleName:%s rat:%s\n", pAP->getId(), styleName.c_str(), rat.getXMLstring() ));
 
 //        if ( ODe_Style_Style::hasTextStyleProps(pAP) )

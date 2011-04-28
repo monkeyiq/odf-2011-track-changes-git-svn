@@ -330,7 +330,6 @@ private:
      */
     void ctSimplifyStyles( PP_RevisionAttr& ra );
     std::string ctSimplifyFromTwoAdjacentStyles( const PP_Revision * r, const PP_Revision * prev );
-    spanStyle ctSimplifyStyle( const ODi_Style_Style* pBloatedStyle, PP_RevisionAttr& complexRA, UT_uint32 rev, PP_RevisionType rt );
 
     
     /*************************************

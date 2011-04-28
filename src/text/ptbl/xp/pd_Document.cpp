@@ -5229,6 +5229,12 @@ bool PD_Document::_syncFileTypes(bool bReadSaveWriteOpen)
 ///////////////////////////////////////////////////////////////////
 // Styles represent named collections of formatting properties.
 
+const char * PD_Document::getDefaultStyle() const
+{
+    return "Normal";
+}
+
+
 bool PD_Document::getStyle(const char * szName, PD_Style ** ppStyle) const
 {
 	return m_pPieceTable->getStyle(szName, ppStyle);

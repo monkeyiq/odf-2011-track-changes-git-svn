@@ -208,10 +208,29 @@ ODe_Style_Style::getTextStyleProps( const PP_AttrProp* pAP,
     
     if( !revString.empty() && revString != "1" && revString != "0" )
     {
-        haveData = true;
         UT_DEBUGMSG(("ODe_Style_Style::getTextStyleProps(3) rat:%s\n", revString.c_str() ));
         PP_RevisionAttr ra( revString.c_str() );
-        pStyle->m_pTextProps->fetchAttributesFromAbiProps( ra );
+
+        //
+        // Check all the revisions and if none mention styles at all then we don't
+        // have any style.
+        //
+        const PP_Revision* r = 0;
+        for( UT_uint32 raIdx = 0;
+             raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
+             raIdx++ )
+        {
+            if ( ODe_Style_Style::hasTextStyleProps( r, false ) )
+            {
+                haveData = true;
+                break;
+            }
+        }
+        UT_DEBUGMSG(("ODe_Style_Style::getTextStyleProps(3) haveStyle:%d\n", haveData ));
+        if( haveData )
+        {
+            pStyle->m_pTextProps->fetchAttributesFromAbiProps( ra );
+        }
     }
 
     if( !haveData )

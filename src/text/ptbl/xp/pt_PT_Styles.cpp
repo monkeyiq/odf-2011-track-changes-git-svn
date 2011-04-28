@@ -396,7 +396,7 @@ bool pt_PieceTable::removeStyle (const gchar * szName)
 bool pt_PieceTable::getStyle(const char * szName, PD_Style ** ppStyle) const
 {
 	//UT_ASSERT(szName && *szName);
-
+    
 	PD_Style * pStyle = m_hashStyles.pick (szName);
 	if (!pStyle)
 		return false;
