@@ -63,7 +63,7 @@ class ODe_ChangeTrackingParagraph_Data
     long m_lastSpanVersion;
     
   public:
-    long m_minRevision;            //< lowest revision appearing in any <c> tag
+    long      m_minRevision;            //< lowest revision appearing in any <c> tag
     UT_uint32 m_maxRevision;            //< highest revision appearing in any <c> tag
     UT_uint32 m_maxDeletedRevision;     //< lowest  -revision appearing in any <c> tag
     UT_uint32 m_minDeletedRevision;     //< highest -revision appearing in any <c> tag
@@ -72,8 +72,8 @@ class ODe_ChangeTrackingParagraph_Data
     UT_uint32 m_maxParaDeletedRevision; //< highest negative version number for para
     UT_uint32 m_lastSpanRevision;       //< revision of last change to last <c> or <p>
     PP_RevisionType m_lastSpanRevisionType; //< ADD/PP_REVISION_DELETION
-    bool m_seeingFirstSpanTag; //< PARSING: Keeping track if this is the first <c> element seen
-    UT_uint32 m_firstSpanRevision;          //< revision of last change to first <c> or <p>
+    bool m_seeingFirstSpanTag;          //< PARSING: Keeping track if this is the first <c> element seen
+    UT_uint32 m_firstSpanRevision;      //< revision of last change to first <c> or <p>
     PP_RevisionType m_firstSpanRevisionType; //< ADD/PP_REVISION_DELETION
     PT_DocPosition m_lastSpanPosition; //< offset of last <c> cpan
     bool m_foundIntermediateContent;   //< true if there is this paragraph is not right after the last one

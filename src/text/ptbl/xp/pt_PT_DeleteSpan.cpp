@@ -41,7 +41,7 @@
 #include "px_CR_SpanChange.h"
 #include "px_CR_Strux.h"
 #include "pp_Revision.h"
-
+#include "ut_conversion.h"
 
 #define SETP(p,v)	do { if (p) (*(p)) = (v); } while (0)
 
@@ -77,6 +77,206 @@ bool pt_PieceTable::deleteSpanWithTable(PT_DocPosition dpos1,
 					  false);
 }
 
+
+/****************************************************************/
+
+bool pt_PieceTable::dumpDoc(
+    const char* msg,
+    PT_DocPosition currentpos,
+    PT_DocPosition endpos )
+{
+    if( !endpos )
+    {
+        m_pDocument->getBounds( true, endpos );
+    }
+    
+    pf_Frag *pf;
+    PT_BlockOffset Offset;
+
+    UT_DEBUGMSG(("dumpDoc(%s) showing range:%d to %d\n", msg, currentpos, endpos ));
+    for( PT_DocPosition pos = currentpos; pos < endpos; )
+    {
+        if(!getFragFromPosition( pos, &pf, &Offset ))
+        {
+            UT_DEBUGMSG(("dumpDoc() NO FRAG AT pos:%d\n", pos ));
+            break;
+        }
+        std::string fragTypeStr;
+        switch( pf->getType() )
+        {
+            case pf_Frag::PFT_Text:     fragTypeStr = "PFT_Text";     break;
+            case pf_Frag::PFT_Object:   fragTypeStr = "PFT_Object";   break;
+            case pf_Frag::PFT_Strux:    fragTypeStr = "PFT_Strux";    break;
+            case pf_Frag::PFT_EndOfDoc: fragTypeStr = "PFT_EndOfDoc"; break;
+            case pf_Frag::PFT_FmtMark:  fragTypeStr = "PFT_FmtMark";  break;
+        }
+        
+        UT_DEBUGMSG(("dumpDoc() pos:%d frag:%p len:%d frag type:%d (%s)\n",
+                     pos, pf, pf->getLength(), pf->getType(), fragTypeStr.c_str() ));
+            
+        if( pf->getType() == pf_Frag::PFT_Strux )
+        {
+            PTStruxType eStruxType = static_cast<pf_Frag_Strux*>(pf)->getStruxType();
+            std::string eStruxTypeStr;
+            switch(eStruxType)
+            {
+                case PTX_Section: eStruxTypeStr = "PTX_Section"; break;
+                case PTX_Block: eStruxTypeStr = "PTX_Block"; break;
+                case PTX_SectionHdrFtr: eStruxTypeStr = "PTX_SectionHdrFtr"; break;
+                case PTX_SectionEndnote: eStruxTypeStr = "PTX_SectionEndnote"; break;
+                case PTX_SectionTable: eStruxTypeStr = "PTX_SectionTable"; break;
+                case PTX_SectionCell: eStruxTypeStr = "PTX_SectionCell"; break;
+                case PTX_SectionFootnote: eStruxTypeStr = "PTX_SectionFootnote"; break;
+                case PTX_SectionMarginnote: eStruxTypeStr = "PTX_SectionMarginnote"; break;
+                case PTX_SectionAnnotation: eStruxTypeStr = "PTX_SectionAnnotation"; break;
+                case PTX_SectionFrame: eStruxTypeStr = "PTX_SectionFrame"; break;
+                case PTX_SectionTOC: eStruxTypeStr = "PTX_SectionTOC"; break;
+                case PTX_EndCell: eStruxTypeStr = "PTX_EndCell"; break;
+                case PTX_EndTable: eStruxTypeStr = "PTX_EndTable"; break;
+                case PTX_EndFootnote: eStruxTypeStr = "PTX_EndFootnote"; break;
+                case PTX_EndMarginnote: eStruxTypeStr = "PTX_EndMarginnote"; break;
+                case PTX_EndEndnote: eStruxTypeStr = "PTX_EndEndnote"; break;
+                case PTX_EndAnnotation: eStruxTypeStr = "PTX_EndAnnotation"; break;
+                case PTX_EndFrame: eStruxTypeStr = "PTX_EndFrame"; break;
+                case PTX_EndTOC: eStruxTypeStr = "PTX_EndTOC"; break;
+                case PTX_StruxDummy: eStruxTypeStr = "PTX_StruxDummy"; break;
+            }
+            
+            UT_DEBUGMSG(("          pos:%d eStruxType:%d (%s)\n", pos, eStruxType, eStruxTypeStr.c_str() ));
+        }
+        pos += pf->getLength();
+    }
+    
+}
+
+
+
+bool pt_PieceTable::deleteSpanChangeTrackingMaybeMarkParagraphEndDeletion(
+    PT_DocPosition currentpos,
+    PT_DocPosition endpos )
+{
+    dumpDoc( "deleteSpanChangeTrackingMaybeMarkParagraphEndDeletion(top)", 0, 0 );
+    
+    UT_DEBUGMSG(("ODTCT: deleteSpanChangeTrackingMaybeMarkParagraphEndDeletion() cpos:%d endpos:%d\n", currentpos, endpos ));
+    
+    //
+    // MIQ: If we are deleting from the middle through the end of
+    // a paragraph then we want to record when the end of the
+    // paragraph was deleted. We need to get the PTX_Block, say
+    // (a), containing the start marker currentpos and make sure that
+    // (a) is closed before endpos is reached.
+    //
+    // First, walk forwards to see if the block will end before
+    // endpos is reached. If so, find the strux (a) that contains
+    // currentpos and mark it as having it's end of block at this
+    // revision.
+    {
+        //
+        // Find the first end-of-block condition that is yonder of
+        // currentpos
+        //
+        UT_DEBUGMSG(("ODTCT: deleteSpan(revisionsEP) searching for eob from:%d\n", currentpos ));
+        pf_Frag *pf;
+        PT_BlockOffset Offset;
+        bool bFoundEndBlockBeforeEndpos = false;
+        for( PT_DocPosition pos = currentpos; !bFoundEndBlockBeforeEndpos && pos < endpos; )
+        {
+            if(!getFragFromPosition( pos, &pf, &Offset ))
+            {
+                UT_DEBUGMSG(("ODTCT: deleteSpan(revisionsEP) NO FRAG AT pos:%d\n", pos ));
+                break;
+            }
+
+            UT_DEBUGMSG(("ODTCT: deleteSpan(revisionsEP) pos:%d frag:%p len:%d frag type:%d\n", pos, pf, pf->getLength(), pf->getType() ));
+            
+            if( pf->getType() == pf_Frag::PFT_Strux )
+            {
+                PTStruxType eStruxType = static_cast<pf_Frag_Strux*>(pf)->getStruxType();
+                switch (eStruxType)
+                {
+                    case PTX_SectionFootnote: 
+                    case PTX_SectionEndnote: 
+                    case PTX_SectionAnnotation:
+                        break;
+                    default:
+                        bFoundEndBlockBeforeEndpos = true;
+                }
+            }
+                
+            pos = pf->getPos() + pf->getLength();
+        }
+            
+
+        UT_DEBUGMSG(("ODTCT: deleteSpan(revisionsEP) found:%d block that ends the currentpos starter is %p at offset:%d len:%d\n",
+                     bFoundEndBlockBeforeEndpos, pf, pf->getPos(), pf->getLength() ));
+            
+            
+        //
+        // find and mark the block containing currentpos as having its
+        // ending deleted in this revision.
+        //
+        if( bFoundEndBlockBeforeEndpos )
+        {
+            pf_Frag_Strux * pfs;
+            PTStruxType eStruxType = PTX_Block;
+            if(!_getStruxOfTypeFromPosition( currentpos, eStruxType, &pfs ))
+            {
+                // failed
+                UT_DEBUGMSG(("ODTCT: deleteSpan(revisionsEP) delete started not inside a ptx_block! currentpos:%d\n", currentpos ));
+            }
+            else
+            {
+                UT_DEBUGMSG(("ODTCT: deleteSpan(revisionsEP) TOP currentpos:%d\n", currentpos ));
+                UT_DEBUGMSG(("ODTCT: deleteSpan(revisionsEP) TOP text strux:%p\n", pfs ));
+
+                const PP_AttrProp * pAP2;
+                if(!getAttrProp(pfs->getIndexAP(),&pAP2))
+                {
+                }
+                else
+                {
+                    const gchar name[] = "revision";
+                    const gchar * pRevision = NULL;
+                    
+                    if(!pAP2->getAttribute(name, pRevision))
+                        pRevision = NULL;
+                    PP_RevisionAttr Revisions(pRevision);
+                    if( pRevision && strstr(pRevision, ABIATTR_PARA_END_DELETED_REVISION))
+                    {
+                        // already deleted at end..
+                    }
+                    else
+                    {
+                        UT_uint32 iId = m_pDocument->getRevisionId();
+                        std::string idstr = tostr(iId);
+                        const gchar* ppAtts[10];
+                        ppAtts[0] = ABIATTR_PARA_END_DELETED_REVISION;
+                        ppAtts[1] = idstr.c_str();
+                        ppAtts[2] = 0;
+                        Revisions.addRevision(1,PP_REVISION_FMT_CHANGE,NULL,ppAtts);
+
+                        const gchar * ppRevAttrib[3];
+                        ppRevAttrib[0] = name;
+                        ppRevAttrib[1] = Revisions.getXMLstring();
+                        ppRevAttrib[2] = NULL;
+
+                        UT_DEBUGMSG(("ODTCT: deleteSpan(revisionsEP) adding end-deleted attr for block at:%d\n", currentpos ));
+                    
+                        int iLen = pf_FRAG_STRUX_BLOCK_LENGTH;
+                        if(! _realChangeStruxFmt(PTC_AddFmt, currentpos + iLen, currentpos + iLen, ppRevAttrib, NULL,
+                                                 eStruxType, true))
+                            return false;
+                    }
+                }
+            }
+        }
+    }
+    
+}
+
+// Useful for quickly blocking bits of code with if(MIQENABLED) for testing.
+#define MIQENABLED 0
+
 /****************************************************************/
 bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 							   PT_DocPosition dpos2,
@@ -85,11 +285,15 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 							   bool bDeleteTableStruxes,
 							   bool bDontGlob)
 {
+    PT_DocPosition startOfRange = dpos1;
+    
   //        getFragments().verifyDoc();
 	if(m_pDocument->isMarkRevisions())
 	{
         UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) TOP dpos1:%d dpos2:%d\n", dpos1, dpos2 ));
-		
+        dumpDoc( "deleteSpan(top)", 0, 0 );
+//        dumpDoc( "deleteSpan(top)", dpos1, dpos2 );
+        
 		bool bHdrFtr = false;
 		// if the user selected the whole document for deletion, we will not delete the
 		// first block (we need always a visible block in any document); we make an
@@ -110,9 +314,11 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 		const gchar name[] = "revision";
 		const gchar * pRevision = NULL;
 
+//        deleteSpanChangeTrackingMaybeMarkParagraphEndDeletion( dpos1, dpos2 );
+        
 		// we cannot retrieve the start and end fragments here and
 		// then work between them in a loop using getNext() because
-		// processing might result in merging of fargments. so we have
+		// processing might result in merging of fragments. so we have
 		// to use the doc position to keep track of where we are and
 		// retrieve the fragments afresh in each step of the loop
 		// Tomas, Oct 28, 2003
@@ -129,12 +335,14 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 
             UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.top dpos1:%d dpos2:%d\n", dpos1, dpos2 ));
             
-			if(!getFragsFromPositions(dpos1,dpos2, &pf1, &Offset1, &pf2, &Offset2))
+			if(!getFragsFromPositions(dpos1, dpos2, &pf1, &Offset1, &pf2, &Offset2))
 				return bRet;
 			else
 				bRet = true;
 
             UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.2 dpos1:%d dpos2:%d\n", dpos1, dpos2 ));
+            UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.2 types pf1:%d pf2:%d pf1.len:%d\n",
+                         pf1->getType(), pf2->getType(), pf1->getLength() ));
 			// get attributes for this fragement
 			const PP_AttrProp * pAP2;
 			pf_Frag::PFType eType = pf1->getType();
@@ -152,7 +360,26 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 					return false;
 
 				eStruxType = static_cast<pf_Frag_Strux*>(pf1)->getStruxType();
+                UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while... eStruxType:%d\n", eStruxType ));
 
+                if( dpos1 > startOfRange )
+                {
+                    // Mark close of block
+                    switch (eStruxType)
+                    {
+                        case PTX_SectionFootnote: 
+                        case PTX_SectionEndnote: 
+                        case PTX_SectionAnnotation:
+                            break;
+                        default:
+                            // If this block ends before dpos2,
+                            // we should also explicitly mark that it's end is deleted.
+                            deleteSpanChangeTrackingMaybeMarkParagraphEndDeletion( dpos1-1, dpos2 );
+                            break;
+                    }
+                }
+                
+                
 				switch (eStruxType)
 				{
 					case PTX_Block:
@@ -162,7 +389,9 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 							dpos1 += iLen;
 							continue;
 						}
-						
+                        UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) block... dpos1:%d dpos2:%d len:%d\n", dpos1, dpos2, iLen ));
+
+                        
 						break;
 						
 					case PTX_SectionTable:
@@ -228,6 +457,8 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 				break;
 			}
 
+            UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while bTableStrux:%d bDeleteTableStruxes:%d\n",
+                         bTableStrux, bDeleteTableStruxes ));
 			if(bTableStrux && !bDeleteTableStruxes)
 			{
 				// skip over this frag
@@ -238,7 +469,10 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 			if(!pAP2->getAttribute(name, pRevision))
 				pRevision = NULL;
 
-            UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.3 dpos1:%d dpos2:%d\n", dpos1, dpos2 ));
+            UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.3 dpos1:%d dpos2:%d pRevision:%p\n", dpos1, dpos2, pRevision ));
+            if( pRevision )
+                UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.3 pRevision.str:%s\n", pRevision ));
+                
 			PP_RevisionAttr Revisions(pRevision);
 
 			// now we need to see if revision with this id is already
@@ -253,9 +487,11 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
                 UT_uint32 gid = 100;
                 if( pRev )
                     gid = pRev->getId();
-                UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.4 pRev:%d iId:%d getId:%d\n", pRev!=0, iId, gid ));
+                UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.4 pRev:%d iId:%d getId:%d dposEnd:%d\n", pRev!=0, iId, gid, dposEnd ));
             }
 
+            if( pRev )
+                UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.5 have pRev, iId:%d pRev->id::%d\n", iId, pRev->getId() ));
 			if(pRev && iId == pRev->getId())
 			{
 				// OK, we already have a revision with this id here,
@@ -379,28 +615,61 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 				}
 			}
 
-			Revisions.addRevision(iId,PP_REVISION_DELETION,NULL,NULL);
+            if( eStruxType == PTX_Block )
+            {
+                UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) old:%s\n", Revisions.getXMLstring() ));
+                if( pRevision && strstr(pRevision, ABIATTR_PARA_START_DELETED_REVISION))
+                {
+                    // already marked as start-of deleted
+                }
+                else
+                {
+                    std::string idstr = tostr(iId);
+                    const gchar* ppAtts[10];
+                    ppAtts[0] = ABIATTR_PARA_START_DELETED_REVISION;
+                    ppAtts[1] = idstr.c_str();
+                    ppAtts[2] = 0;
+                    Revisions.addRevision(1,PP_REVISION_FMT_CHANGE,NULL,ppAtts);
+                }
+            }
+            Revisions.addRevision(iId,PP_REVISION_DELETION,NULL,NULL);
 			const gchar * ppRevAttrib[3];
 			ppRevAttrib[0] = name;
 			ppRevAttrib[1] = Revisions.getXMLstring();
 			ppRevAttrib[2] = NULL;
-            UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.6 dpos1:%d dpos2:%d\n", dpos1, dpos2 ));
+            UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) while.6 dpos1:%d dpos2:%d eType:%d RX:%s\n", dpos1, dpos2, eType, Revisions.getXMLstring() ));
 
 			switch (eType)
 			{
 				case pf_Frag::PFT_Object:
 				case pf_Frag::PFT_Text:
+                    UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) addfmt dpos1:%d dposEnd:%d\n", dpos1, dposEnd ));
 					if(! _realChangeSpanFmt(PTC_AddFmt, dpos1, dposEnd, ppRevAttrib,NULL,true))
 						return false;
+
+                    //
+                    // MIQ: The above _realChangeSpanFmt() may have split the fragment,
+                    //      So we should get the pf_Frag again and adjust dposEnd if nessesary
+                    {
+                        pf_Frag * pft;
+                        PT_BlockOffset toffset;
+                        getFragFromPosition(dpos1, &pft, &toffset);
+                        UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) addfmt dpos1:%d dposEnd:%d toffset:%d pftpos:%d pftlen:%d\n",
+                                     dpos1, dposEnd, toffset, pft->getPos(), pft->getLength() ));
+
+                        dposEnd = pft->getPos() + pft->getLength();
+                    }
+                    
 					break;
 
 				case pf_Frag::PFT_Strux:
+                    UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) strux dpos1:%d iLen:%d\n", dpos1, iLen ));
 					// _realChangeStruxFmt() changes the strux
 					// *containing* the given position, hence we pass
 					// it the position immediately after the strux; we
 					// only want the one strux changed, so we pass
 					// identical position in both parameters
-					if(! _realChangeStruxFmt(PTC_AddFmt, dpos1 + iLen, dpos1 + iLen /*2*iLen*/, ppRevAttrib,NULL,
+                    if(! _realChangeStruxFmt(PTC_AddFmt, dpos1 + iLen, dpos1 + iLen /*2*iLen*/, ppRevAttrib,NULL,
 											 eStruxType,true))
 						return false;
 

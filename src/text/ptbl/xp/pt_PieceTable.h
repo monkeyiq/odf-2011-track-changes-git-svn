@@ -165,6 +165,9 @@ public:
 									   UT_uint32 length, fd_Field * pField = NULL,
 									   bool bAddChangeRec = true);
 
+    bool deleteSpanChangeTrackingMaybeMarkParagraphEndDeletion( PT_DocPosition currentpos,
+                                                                PT_DocPosition endpos );
+    
 	bool					deleteSpan(PT_DocPosition dpos1,
 									   PT_DocPosition dpos2,
 									   PP_AttrProp *p_AttrProp_Before,
@@ -308,6 +311,9 @@ public:
 	PT_DocPosition			getStruxPosition(PL_StruxDocHandle sdh) const;
 	PT_DocPosition			getFragPosition(const pf_Frag * pfToFind) const;
 
+    bool dumpDoc( const char* msg, PT_DocPosition currentpos, PT_DocPosition endpos );
+
+    
 	bool					getFragFromPosition(PT_DocPosition docPos,
 												pf_Frag ** ppf,
 												PT_BlockOffset * pOffset) const;
