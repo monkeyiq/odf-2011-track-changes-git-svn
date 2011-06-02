@@ -2672,6 +2672,13 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
         startOfParagraphWasDeleted = false;
     }
 
+    // FIXME:
+    if( wholeOfParagraphWasDeleted )
+        startOfParagraphWasDeleted = false;
+    UT_DEBUGMSG(("CTXXX stDel:%d allDel:%d\n",
+                 startOfParagraphWasDeleted, wholeOfParagraphWasDeleted ));
+
+    
     UT_DEBUGMSG(("opening para closeElementWithSlashGreaterThan:%d\n", startOfParagraphWasDeleted ));
 //    output += "<!--- -->";
     _openODParagraphToBuffer( pAP,

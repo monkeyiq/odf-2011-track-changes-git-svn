@@ -177,7 +177,7 @@ typedef const void * PL_StruxFmtHandle;
 #define PT_CHANGETRACKING_SPLIT_IS_NEW (static_cast<const gchar *>("ct:split-is-new"))
 
 
-#define ABIATTR_PARA_START_DELETED_REVISION (static_cast<const gchar *>("abi:para-start-deleted-revision"))
-#define ABIATTR_PARA_END_DELETED_REVISION   (static_cast<const gchar *>("abi:para-end-deleted-revision"))
+#define ABIATTR_PARA_START_DELETED_REVISION (static_cast<const gchar *>("abi-para-start-deleted-revision"))
+#define ABIATTR_PARA_END_DELETED_REVISION   (static_cast<const gchar *>("abi-para-end-deleted-revision"))
 
 #endif /* PT_TYPES_H */

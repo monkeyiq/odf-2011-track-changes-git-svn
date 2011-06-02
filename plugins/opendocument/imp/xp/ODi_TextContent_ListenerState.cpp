@@ -1715,6 +1715,62 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
     {
         UT_DEBUGMSG(("delta:leading-partial-content (end)\n" ));
 
+        // doesn't much matter here if there was actually any text
+        // content in the leading-partial-content (?)
+//        if (m_charData.size () > 0 && m_bAcceptingText)
+        {
+            // We get here with the following sort of ODF fragment
+            // <text:p delta:insertion-change-idref="1" >
+            // This is a sample <delta:merge delta:removal-change-idref="2">
+            //   <delta:leading-partial-content>paragraph.</delta:leading-partial-content>
+            //
+            // So we want to mark the end of the text:p as deleted by
+            // Setting the last PTX_Block
+            // revision/ABIATTR_PARA_END_DELETED_REVISION to m_mergeIDRef
+
+            PT_DocPosition epos = 0;
+            m_pAbiDocument->getBounds(true,epos);
+
+            PL_StruxDocHandle sdh;
+            PTStruxType eStruxType = PTX_Block;
+            if(!m_pAbiDocument->getStruxOfTypeFromPosition( epos, eStruxType, &sdh ))
+            {
+                UT_DEBUGMSG(("ODTCT: loading delta:merge failed to get block! should not happen!\n" ));
+            }
+            else
+            {
+                PT_AttrPropIndex api = m_pAbiDocument->getAPIFromSDH( sdh );
+                const PP_AttrProp * pAP = 0;
+                if( m_pAbiDocument->getAttrProp( api, &pAP) )
+                {
+                    const char* pValue = 0;
+                    if( pAP->getAttribute("revision", pValue))
+                    {
+                        UT_DEBUGMSG(("ODTCT: loading delta:merge revision:%s\n", pValue ));
+                        PP_RevisionAttr Revisions(pValue);
+                        
+                        const gchar* ppAtts[10];
+                        ppAtts[0] = ABIATTR_PARA_END_DELETED_REVISION;
+                        ppAtts[1] = m_mergeIDRef.c_str();
+                        ppAtts[2] = 0;
+                        Revisions.addRevision(1,PP_REVISION_FMT_CHANGE,ppAtts,NULL);
+
+                        UT_DEBUGMSG(("ODTCT: loading delta:merge updated revision:%s\n", Revisions.getXMLstring() ));
+//                        pAP->setAttribute("revision", Revisions.getXMLstring());
+
+                        const gchar * ppRevAttrib[3];
+                        ppRevAttrib[0] = "revision";
+                        ppRevAttrib[1] = Revisions.getXMLstring();
+                        ppRevAttrib[2] = NULL;
+                        bool rc = m_pAbiDocument->changeStruxFormatNoUpdate( PTC_AddFmt, sdh, ppRevAttrib );
+                        UT_DEBUGMSG(("ODTCT: loading delta:merge updated rc:%d\n", rc ));
+                        
+                    }
+                }
+                
+            }
+        }
+        
         _flush ();
         if( m_ctHaveParagraphFmt )
         {
@@ -2668,6 +2724,27 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         // maintain stack of insert/delete operations
         //
         m_ctAddRemoveStack.push_back( make_pair( PP_REVISION_ADDITION, ctInsertionChangeIDRef ));
+
+
+        //
+        // If we are inside one of these deleted constructs then we
+        // should mark the start and possibly the end of the paragraph as deleted
+        // explicitly in the revision attribute
+        //
+        if( m_mergeIsInsideTrailingPartialContent || m_mergeIsInsideIntermediateContent )
+        {
+            const gchar* ppAtts[10];
+            ppAtts[0] = ABIATTR_PARA_START_DELETED_REVISION;
+            ppAtts[1] = m_mergeIDRef.c_str();
+            ppAtts[2] = 0;
+            if( m_mergeIsInsideIntermediateContent )
+            {
+                ppAtts[2] = ABIATTR_PARA_END_DELETED_REVISION;
+                ppAtts[3] = m_mergeIDRef.c_str();
+                ppAtts[4] = 0;
+            }
+            ctRevision.addRevision(1,PP_REVISION_FMT_CHANGE,ppAtts,NULL);
+        }
         
 
         if( ctInsertionType == "insert-with-content" || ctInsertionType == "split" )

@@ -20,6 +20,7 @@
  */
 
 #include "ODe_ChangeTrackingParagraph.h"
+#include "ut_conversion.h"
 
 
 void
@@ -36,6 +37,32 @@ ODe_ChangeTrackingParagraph_Data::updatePara( const PP_RevisionAttr* ra )
     m_lastSpanVersion = -1;
 
     m_seeingFirstSpanTag = true;
+
+    m_paraEndDeletedRevision   = 0;
+    m_paraStartDeletedRevision = 0;
+    
+    UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::updatePara() new code...r.xml:%s\n", ra->getXMLstring() ));
+    UT_uint32 iMinId = 0;
+	if( const PP_Revision * r = ra->getRevisionWithId( 1, iMinId ) )
+    {
+        UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::updatePara() have rev...a:%s\n", r->getAttrsString() ));
+        UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::updatePara() have rev...p:%s\n", r->getPropsString() ));
+
+        UT_getAttributeTyped( r, ABIATTR_PARA_END_DELETED_REVISION, 0 );
+        
+        if( UT_uint32 v = UT_getAttributeTyped<UT_uint32>( r, ABIATTR_PARA_END_DELETED_REVISION, 0 ))
+        {
+            UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::updatePara(T) end-deleted:%d\n", v ));
+            m_paraEndDeletedRevision = v;
+        }
+        if( UT_uint32 v = UT_getAttributeTyped<UT_uint32>( r, ABIATTR_PARA_START_DELETED_REVISION, 0 ))
+        {
+            UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::updatePara(T) start-deleted:%d\n", v ));
+            m_paraStartDeletedRevision = v;
+        }
+    }
+    
+    UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::updatePara() DONE\n" ));
 }
 
 
@@ -158,38 +185,47 @@ ODe_ChangeTrackingParagraph_Data::isParagraphStartDeleted()
                  m_firstSpanRevisionType,
                  m_firstSpanRevision,
                  m_maxParaDeletedRevision ));
-    
-    bool ret = false;
 
-    if( m_firstSpanRevisionType == PP_REVISION_DELETION )
-    {
-        if( m_firstSpanRevision == m_maxParaDeletedRevision )
-        {
-            UT_DEBUGMSG(("isParagraphStartDeleted yes case 1\n" ));
-            ret = true;
-        }
-    }
+    UT_DEBUGMSG(("isParagraphStartDeleted() m_paraStartDeletedRevision:%d\n", m_paraStartDeletedRevision ));
+    UT_DEBUGMSG(("isParagraphStartDeleted() m_paraEndDeletedRevision:%d\n", m_paraEndDeletedRevision ));
+    return m_paraStartDeletedRevision > 0;
     
-    if( m_maxParaDeletedRevision )
-    {
-        if( m_minDeletedRevision < m_maxParaDeletedRevision )
-        {
-            UT_DEBUGMSG(("isParagraphStartDeleted yes case 2\n" ));
-            ret = true;
-        }
-    }
-    return ret;
+    
+    // bool ret = false;
+
+    // if( m_firstSpanRevisionType == PP_REVISION_DELETION )
+    // {
+    //     if( m_firstSpanRevision == m_maxParaDeletedRevision )
+    //     {
+    //         UT_DEBUGMSG(("isParagraphStartDeleted yes case 1\n" ));
+    //         ret = true;
+    //     }
+    // }
+    
+    // if( m_maxParaDeletedRevision )
+    // {
+    //     if( m_minDeletedRevision < m_maxParaDeletedRevision )
+    //     {
+    //         UT_DEBUGMSG(("isParagraphStartDeleted yes case 2\n" ));
+    //         ret = true;
+    //     }
+    // }
+    // return ret;
 }
 
 bool
 ODe_ChangeTrackingParagraph_Data::isParagraphEndDeleted()
 {
-    if( m_lastSpanRevisionType == PP_REVISION_DELETION )
-    {
-        return true;
-    }
+    UT_DEBUGMSG(("isParagraphStartDeleted() m_paraStartDeletedRevision:%d\n", m_paraStartDeletedRevision ));
+    UT_DEBUGMSG(("isParagraphStartDeleted() m_paraEndDeletedRevision:%d\n", m_paraEndDeletedRevision ));
+    return m_paraEndDeletedRevision > 0;
+
+    // if( m_lastSpanRevisionType == PP_REVISION_DELETION )
+    // {
+    //     return true;
+    // }
     
-    return false;
+    // return false;
 }
 
 
@@ -200,18 +236,21 @@ ODe_ChangeTrackingParagraph_Data::isParagraphDeleted()
     UT_DEBUGMSG(("isParagraphDeleted: m_maxRevision:%d m_maxDeletedRevision:%d all-spans-same-rev:%d\n",
                  m_maxRevision, m_maxDeletedRevision, m_allSpansAreSameVersion ));
 
-    // table cells might have <c></c> elements with no revision numbers in them
-    if( m_maxParaDeletedRevision > 0 )
-    {
-        if( m_allSpansAreSameVersion && !m_maxRevision )
-        {
-            return true;
-        }
-    }
+    return isParagraphStartDeleted() && isParagraphEndDeleted();
+    
+    
+    // // table cells might have <c></c> elements with no revision numbers in them
+    // if( m_maxParaDeletedRevision > 0 )
+    // {
+    //     if( m_allSpansAreSameVersion && !m_maxRevision )
+    //     {
+    //         return true;
+    //     }
+    // }
 
-    return m_maxRevision
-        && m_maxRevision == m_maxDeletedRevision
-        && m_allSpansAreSameVersion;
+    // return m_maxRevision
+    //     && m_maxRevision == m_maxDeletedRevision
+    //     && m_allSpansAreSameVersion;
 }
 
 UT_uint32

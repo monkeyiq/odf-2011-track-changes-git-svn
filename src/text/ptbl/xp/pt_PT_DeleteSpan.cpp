@@ -253,7 +253,7 @@ bool pt_PieceTable::deleteSpanChangeTrackingMaybeMarkParagraphEndDeletion(
                         ppAtts[0] = ABIATTR_PARA_END_DELETED_REVISION;
                         ppAtts[1] = idstr.c_str();
                         ppAtts[2] = 0;
-                        Revisions.addRevision(1,PP_REVISION_FMT_CHANGE,NULL,ppAtts);
+                        Revisions.addRevision(1,PP_REVISION_FMT_CHANGE,ppAtts,NULL);
 
                         const gchar * ppRevAttrib[3];
                         ppRevAttrib[0] = name;
@@ -314,7 +314,7 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
 		const gchar name[] = "revision";
 		const gchar * pRevision = NULL;
 
-//        deleteSpanChangeTrackingMaybeMarkParagraphEndDeletion( dpos1, dpos2 );
+        deleteSpanChangeTrackingMaybeMarkParagraphEndDeletion( dpos1, dpos2 );
         
 		// we cannot retrieve the start and end fragments here and
 		// then work between them in a loop using getNext() because
@@ -629,7 +629,7 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
                     ppAtts[0] = ABIATTR_PARA_START_DELETED_REVISION;
                     ppAtts[1] = idstr.c_str();
                     ppAtts[2] = 0;
-                    Revisions.addRevision(1,PP_REVISION_FMT_CHANGE,NULL,ppAtts);
+                    Revisions.addRevision(1,PP_REVISION_FMT_CHANGE,ppAtts,NULL);
                 }
             }
             Revisions.addRevision(iId,PP_REVISION_DELETION,NULL,NULL);
