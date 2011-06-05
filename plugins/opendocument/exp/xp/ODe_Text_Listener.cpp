@@ -548,9 +548,12 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
                                 firstSpanInNextParagraphIsDeleted = true;
                             }
                         }
+
                         
-                        if( firstSpanInNextParagraphIsDeleted
-                            && getCurrentDocumentPosition() == ctp->getData().m_lastSpanPosition )
+                        UT_DEBUGMSG(("Text_Listener::openSpan() checking for del of end...\n" ));
+                        // if( firstSpanInNextParagraphIsDeleted
+                        //     && getCurrentDocumentPosition() == ctp->getData().m_lastSpanPosition )
+                        if( ctp->getData().isParagraphEndDeleted() )
                         {
                             UT_uint32 rev = last->getId();
                             m_ctDeltaMerge = new ODe_ChangeTrackingDeltaMerge( m_rAuxiliaryData, rev );
@@ -2171,6 +2174,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
     std::stringstream additionalElementAttributesStream;
     bool              wholeOfParagraphWasDeleted = false;
     bool              startOfParagraphWasDeleted = false;
+    bool              endOfParagraphWasDeleted = false;
     std::stringstream startOfParagraphWasDeletedPostamble;
     pChangeTrackingParagraphData_t ctp = m_rAuxiliaryData.getChangeTrackingParagraphData( getCurrentDocumentPosition() );
     UT_DEBUGMSG(("CT pos:%d have ctp pointer:%p\n",getCurrentDocumentPosition(),ctp));
@@ -2491,6 +2495,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
         bool wholeOfLastParaWasDeleted = false;
         wholeOfParagraphWasDeleted = ctp->getData().isParagraphDeleted();
         startOfParagraphWasDeleted = ctp->getData().isParagraphStartDeleted();
+        endOfParagraphWasDeleted   = ctp->getData().isParagraphEndDeleted();
         std::string insType = "insert-with-content";
 
         if( pChangeTrackingParagraphData_t prev = ctp->getPrevious() )
@@ -2500,6 +2505,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
 
         UT_DEBUGMSG(("ODTCT wholeD:%d wholeLastD:%d\n",  wholeOfParagraphWasDeleted, wholeOfLastParaWasDeleted ));
         UT_DEBUGMSG(("ODTCT startD:%d intable:%ld\n", startOfParagraphWasDeleted, m_rAuxiliaryData.m_ChangeTrackingAreWeInsideTable ));
+        UT_DEBUGMSG(("ODTCT endD:%d\n", endOfParagraphWasDeleted ));
         
         //
         // When two paragraphs are merged together then the old
@@ -2580,7 +2586,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
         }
         else
         {
-            UT_DEBUGMSG(("ODTCT  Introversion:%d\n", ctp->getData().getVersionWhichIntroducesParagraph() ));
+            UT_DEBUGMSG(("ODTCT  Intro Version:%d\n", ctp->getData().getVersionWhichIntroducesParagraph() ));
             const char* splitID    = UT_getAttribute( pAP, PT_CHANGETRACKING_SPLIT_ID, 0 );
             const char* splitIDRef = UT_getAttribute( pAP, PT_CHANGETRACKING_SPLIT_ID_REF, 0 );
 
