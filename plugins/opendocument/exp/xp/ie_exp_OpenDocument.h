@@ -40,6 +40,7 @@ public:
     IE_Exp_OpenDocument(PD_Document * pDocument);
     virtual ~IE_Exp_OpenDocument();
     void setGSFOutput(GsfOutput * pBuf);
+    void useChangeTracking( bool v );
 protected:
     virtual GsfOutput* _openFile(const char *szFilename);
     virtual UT_Error  _writeDocument(void);
@@ -49,6 +50,7 @@ private:
     UT_Error runListenerImpl( ODe_AbiDocListenerImpl* pAbiDocListenerImpl );
     // The OpenDocument Text file.
     GsfOutfile* m_odt;
+    bool m_useChangeTracking;
 };
 
 #endif //_IE_EXP_OPENDOCUMENT_H_

@@ -111,6 +111,8 @@ class ODe_AuxiliaryData
     /////////////////////////////////
 
     // Lookahead information for each <p> tag
+    bool useChangeTracking(); //< should change tracking markup be produced.
+    void useChangeTracking( bool v ); //< should change tracking markup be produced.
     
     typedef std::list< pChangeTrackingParagraphData_t > m_ChangeTrackingParagraphs_t;
     m_ChangeTrackingParagraphs_t m_ChangeTrackingParagraphs;
@@ -128,6 +130,7 @@ class ODe_AuxiliaryData
 
   private:
     pChangeTrackingParagraphData_t getChangeTrackingParagraphDataContaining( PT_DocPosition pos );
+    bool m_useChangeTracking;
 
 };
 

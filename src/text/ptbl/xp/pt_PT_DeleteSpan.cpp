@@ -625,14 +625,23 @@ bool pt_PieceTable::deleteSpan(PT_DocPosition dpos1,
                 else
                 {
                     std::string idstr = tostr(iId);
-                    const gchar* ppAtts[10];
-                    ppAtts[0] = ABIATTR_PARA_START_DELETED_REVISION;
-                    ppAtts[1] = idstr.c_str();
-                    ppAtts[2] = 0;
-                    Revisions.addRevision(1,PP_REVISION_FMT_CHANGE,ppAtts,NULL);
+                    Revisions.mergeAttr( 1, PP_REVISION_FMT_CHANGE,
+                                         ABIATTR_PARA_START_DELETED_REVISION,
+                                         idstr.c_str() );
+                    UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) DONE adding, revs:%s\n", Revisions.getXMLstring() ));
+                    
+                    // std::string idstr = tostr(iId);
+                    // const gchar* ppAtts[10];
+                    // ppAtts[0] = ABIATTR_PARA_START_DELETED_REVISION;
+                    // ppAtts[1] = idstr.c_str();
+                    // ppAtts[2] = 0;
+                    // UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) adding del ppattrs\n" ));
+                    // Revisions.addRevision(1,PP_REVISION_FMT_CHANGE,ppAtts,ppAtts);
+                    // UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) DONE adding del ppattrs\n" ));
                 }
             }
             Revisions.addRevision(iId,PP_REVISION_DELETION,NULL,NULL);
+            UT_DEBUGMSG(("ODTCT: deleteSpan(revisions) 2...\n" ));
 			const gchar * ppRevAttrib[3];
 			ppRevAttrib[0] = name;
 			ppRevAttrib[1] = Revisions.getXMLstring();

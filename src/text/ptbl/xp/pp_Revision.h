@@ -192,6 +192,8 @@ class ABI_EXPORT PP_RevisionAttr
 //    PP_RevisionAttr& operator=(const PP_RevisionAttr &rhs);
     
     void mergeAll( const PP_RevisionAttr& ra );
+    void mergeAttr( UT_uint32 iId, PP_RevisionType t,
+                    const gchar* pzName, const gchar* pzValue );
     
   private:
 	void _init(const gchar *r);

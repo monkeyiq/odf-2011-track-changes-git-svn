@@ -67,8 +67,23 @@
  * Constructor
  */
 IE_Exp_OpenDocument::IE_Exp_OpenDocument (PD_Document * pDoc)
-  : IE_Exp (pDoc), m_odt(0)
+    : IE_Exp (pDoc), m_odt(0), m_useChangeTracking(false)
 {
+    if( pDoc )
+    {
+        UT_DEBUGMSG(("IE_Exp_OpenDocument() pDoc:%p mark:%d show:%d hrev:%d\n",
+                     pDoc,
+                     pDoc->isMarkRevisions(),
+                     pDoc->isShowRevisions(),
+                     pDoc->getHighestRevisionId() ));
+        m_useChangeTracking |= pDoc->isMarkRevisions();
+        m_useChangeTracking |= ( pDoc->getHighestRevisionId() > 1 );
+        
+//        m_useChangeTracking |= pDoc->isShowRevisions();
+        UT_DEBUGMSG(("IE_Exp_OpenDocument() pDoc:%p m_useChangeTracking:%d\n",
+                     pDoc, m_useChangeTracking ));
+    }
+    
 }
 
 
@@ -107,6 +122,12 @@ void IE_Exp_OpenDocument::setGSFOutput(GsfOutput * pBuf)
     m_odt = gsf_output_container(pBuf);
 }
 
+void IE_Exp_OpenDocument::useChangeTracking( bool v )
+{
+    m_useChangeTracking = v;
+}
+
+
 /*!
  * This method copies the selection defined by pDocRange to ODT format
  * placed in the ByteBuf bufODT
@@ -138,6 +159,10 @@ UT_Error IE_Exp_OpenDocument::copyToBuffer(PD_DocumentRange * pDocRange,UT_ByteB
     {
          return aerr;
     }
+    if( IE_Exp_OpenDocument* dc = dynamic_cast<IE_Exp_OpenDocument*>(pNewExp))
+    {
+        dc->useChangeTracking( false );
+    }
     aerr = pNewExp->writeFile(szTempFileName);
     if(aerr != UT_OK)
     {
@@ -161,7 +186,13 @@ UT_Error IE_Exp_OpenDocument::copyToBuffer(PD_DocumentRange * pDocRange,UT_ByteB
     delete pNewExp;
     delete pRangeListener;
     UNREFP( outDoc);
-    g_remove(szTempFileName);
+
+    if( DEBUG && g_getenv("ABIWORD_DEBUG_ODT_LEAVE_CLIP" ))
+    {}
+    else
+    {
+        g_remove(szTempFileName);
+    }
     g_free (szTempFileName);
     return aerr;
 }
@@ -179,6 +210,8 @@ UT_Error IE_Exp_OpenDocument::_writeDocument(void)
     
 	UT_return_val_if_fail (getFp(), UT_ERROR);
 
+    auxData.useChangeTracking( m_useChangeTracking );
+    
 	const std::string & prop = getProperty ("uncompressed");
 	
 	if (!prop.empty() && UT_parseBool (prop.c_str (), false))
@@ -300,7 +333,7 @@ UT_Error IE_Exp_OpenDocument::_writeDocument(void)
 
     // Gather revision information for the ODT+CT
     // change tracker exporting to use.
-    // if( change-tracking )
+    if( m_useChangeTracking )
     {
         UT_Error e = runListenerImpl(
             new ODe_ChangeTrackingParagraph_Listener(

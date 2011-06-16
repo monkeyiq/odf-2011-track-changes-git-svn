@@ -34,7 +34,8 @@ ODe_AuxiliaryData::ODe_AuxiliaryData() :
     m_tableCount(0),
     m_frameCount(0),
     m_noteCount(0),
-    m_ChangeTrackingAreWeInsideTable(0)
+    m_ChangeTrackingAreWeInsideTable(0),
+    m_useChangeTracking( true )
 {
 }
 
@@ -252,5 +253,15 @@ std::string
 getDefaultODFValueForAttribute( const std::string& attr )
 {
     return "";
+}
+
+bool ODe_AuxiliaryData::useChangeTracking()
+{
+    return m_useChangeTracking;
+}
+
+void ODe_AuxiliaryData::useChangeTracking( bool v )
+{
+    m_useChangeTracking = v;
 }
 

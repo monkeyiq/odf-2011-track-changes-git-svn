@@ -968,6 +968,19 @@ PP_RevisionAttr::addRevision( const PP_Revision* r )
     setRevision( tmp.c_str() );
 }
 
+void PP_RevisionAttr::mergeAttr( UT_uint32 iId, PP_RevisionType t,
+                                 const gchar* pzName, const gchar* pzValue )
+{
+    PP_RevisionAttr ra;
+    const gchar* ppAtts[10];
+    ppAtts[0] = pzName;
+    ppAtts[1] = pzValue;
+    ppAtts[2] = 0;
+    ra.addRevision(iId,t,ppAtts,NULL);
+
+    mergeAll( ra );
+}
+
 
 void PP_RevisionAttr::mergeAll( const PP_RevisionAttr& ra )
 {

@@ -87,7 +87,6 @@ ODe_Text_Listener::ODe_Text_Listener(ODe_Styles& rStyles,
     , m_rAuxiliaryData(rAuxiliaryData)
     , m_zIndex(zIndex)
     , m_iCurrentTOC(0)
-    , m_useChangeTracking( true )
     , m_ctpParagraphAdditionalSpacesOffset(0)
     , m_ctDeltaMerge(0)
     , m_ctDeltaMergeJustStarted(false)
@@ -129,7 +128,6 @@ ODe_Text_Listener::ODe_Text_Listener(ODe_Styles& rStyles,
     , m_rAuxiliaryData(rAuxiliaryData)
     , m_zIndex(zIndex)
     , m_iCurrentTOC(0)
-    , m_useChangeTracking( true )
     , m_ctpParagraphAdditionalSpacesOffset(0)
     , m_ctDeltaMerge(0)
     , m_ctDeltaMergeJustStarted(false)
@@ -163,6 +161,12 @@ ODe_Text_Listener::~ODe_Text_Listener()
         ODe_writeUTF8String(m_pParagraphContent, m_ctDeltaMerge->flushBuffer().c_str() );
     }
     ctDeltaMerge_cleanup();
+}
+
+
+bool ODe_Text_Listener::useChangeTracking()
+{
+    return m_rAuxiliaryData.useChangeTracking();
 }
 
 
@@ -454,7 +458,7 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
     
     UT_DEBUGMSG(("ODe_Text_Listener::openSpan()\n"));
 
-    if( !m_useChangeTracking )
+    if( !useChangeTracking() )
     {
         styleName = ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles );
         UT_DEBUGMSG(("ODe_Text_Listener::openSpan() styleName:%s\n", styleName.c_str() ));
@@ -761,7 +765,7 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
  */
 void ODe_Text_Listener::closeSpan()
 {
-    if( !m_useChangeTracking )
+    if( !useChangeTracking() )
     {
         if (m_openedODSpan)
         {

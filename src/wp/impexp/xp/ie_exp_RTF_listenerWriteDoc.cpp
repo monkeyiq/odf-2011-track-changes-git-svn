@@ -1460,6 +1460,7 @@ void s_RTF_ListenerWriteDoc::_openSpan(PT_AttrPropIndex apiSpan,  const PP_AttrP
 			UT_DEBUGMSG(("DOM: szDeltaMoveID = %s\n", "NOT FOUND..." ));
 		}
 	}
+	// DEBUG
 	{
 		const gchar * t = 0;
 		if( pBlockAP )
