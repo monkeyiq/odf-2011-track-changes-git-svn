@@ -179,5 +179,6 @@ typedef const void * PL_StruxFmtHandle;
 
 #define ABIATTR_PARA_START_DELETED_REVISION (static_cast<const gchar *>("abi-para-start-deleted-revision"))
 #define ABIATTR_PARA_END_DELETED_REVISION   (static_cast<const gchar *>("abi-para-end-deleted-revision"))
+#define ABIATTR_PARA_DELETED_REVISION   (static_cast<const gchar *>("abi-para-deleted-revision"))
 
 #endif /* PT_TYPES_H */

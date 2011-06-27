@@ -165,6 +165,10 @@ public:
 									   UT_uint32 length, fd_Field * pField = NULL,
 									   bool bAddChangeRec = true);
 
+    pf_Frag* getEndOfBlock( PT_DocPosition currentpos, PT_DocPosition endpos );
+    bool deleteSpanChangeTrackingAreWeMarkingCoalesce( PT_DocPosition startpos,
+                                                       PT_DocPosition endpos );
+    
     bool deleteSpanChangeTrackingMaybeMarkParagraphEndDeletion( PT_DocPosition currentpos,
                                                                 PT_DocPosition endpos );
     
@@ -373,6 +377,10 @@ public:
 
 protected:
 
+    pf_Frag_Strux*          _findLastStruxOfType(pf_Frag * pfStart,
+                                                 PTStruxType pst,
+                                                 PTStruxType* stopConditions,
+                                                 bool bSkipEmbededSections );
 	pf_Frag *               _findLastStruxOfType(pf_Frag * pfStart, PTStruxType pst, bool bSkipEmbeded);
 	pf_Frag *               _findPrevHyperlink(pf_Frag * pfStart);
 	pf_Frag *               _findNextHyperlink(pf_Frag * pfStart);
