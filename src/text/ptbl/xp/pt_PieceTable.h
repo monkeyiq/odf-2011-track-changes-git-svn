@@ -166,8 +166,13 @@ public:
 									   bool bAddChangeRec = true);
 
     pf_Frag* getEndOfBlock( PT_DocPosition currentpos, PT_DocPosition endpos );
-    bool deleteSpanChangeTrackingAreWeMarkingCoalesce( PT_DocPosition startpos,
-                                                       PT_DocPosition endpos );
+    bool deleteSpanChangeTrackingAreWeMarkingDeltaMerge( PT_DocPosition startpos,
+                                                         PT_DocPosition endpos );
+    pf_Frag_Strux* inSameBlock( PT_DocPosition startpos, PT_DocPosition endpos );
+    bool changeTrackingAddParaAttribute( pf_Frag_Strux* pfs,
+                                         const char* attr,
+                                         std::string v );
+
     
     bool deleteSpanChangeTrackingMaybeMarkParagraphEndDeletion( PT_DocPosition currentpos,
                                                                 PT_DocPosition endpos );
@@ -311,6 +316,7 @@ public:
 
 	bool					getBlockBuf(PL_StruxDocHandle sdh, UT_GrowBuf * pgb) const;
 
+    PT_DocPosition          getPosEnd();
 	bool					getBounds(bool bEnd, PT_DocPosition & docPos) const;
 	PT_DocPosition			getStruxPosition(PL_StruxDocHandle sdh) const;
 	PT_DocPosition			getFragPosition(const pf_Frag * pfToFind) const;
@@ -381,7 +387,7 @@ protected:
                                                  PTStruxType pst,
                                                  PTStruxType* stopConditions,
                                                  bool bSkipEmbededSections );
-	pf_Frag *               _findLastStruxOfType(pf_Frag * pfStart, PTStruxType pst, bool bSkipEmbeded);
+	pf_Frag_Strux*          _findLastStruxOfType(pf_Frag * pfStart, PTStruxType pst, bool bSkipEmbeded);
 	pf_Frag *               _findPrevHyperlink(pf_Frag * pfStart);
 	pf_Frag *               _findNextHyperlink(pf_Frag * pfStart);
 

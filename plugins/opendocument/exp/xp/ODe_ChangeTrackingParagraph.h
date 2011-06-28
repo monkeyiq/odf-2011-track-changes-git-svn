@@ -77,6 +77,7 @@ class ODe_ChangeTrackingParagraph_Data
     PP_RevisionType m_firstSpanRevisionType; //< ADD/PP_REVISION_DELETION
     PT_DocPosition m_lastSpanPosition; //< offset of last <c> cpan
     bool m_foundIntermediateContent;   //< true if there is this paragraph is not right after the last one
+    UT_uint32 m_paraDeletedRevision;      //< Paragraphs ABIATTR_PARA_DELETED_REVISION
     UT_uint32 m_paraEndDeletedRevision;   //< Paragraphs ABIATTR_PARA_END_DELETED_REVISION
     UT_uint32 m_paraStartDeletedRevision; //< Paragraphs ABIATTR_PARA_START_DELETED_REVISION
     
@@ -94,6 +95,7 @@ class ODe_ChangeTrackingParagraph_Data
         , m_seeingFirstSpanTag(false) // init in updatePara()
         , m_lastSpanPosition(0)
         , m_foundIntermediateContent( false )
+        , m_paraDeletedRevision( 0 )
         , m_paraEndDeletedRevision( 0 )
         , m_paraStartDeletedRevision( 0 )
     {

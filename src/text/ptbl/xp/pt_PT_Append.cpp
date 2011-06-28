@@ -83,7 +83,8 @@ bool pt_PieceTable::appendStrux(PTStruxType pts, const gchar ** attributes, pf_F
 /**
  * MIQ11: Extends the old _findLastStruxOfType adding a stopCondition
  * for failure and returning a Strux* directly in the case of success.
- *
+ * This is like a findBackwards() from a fragment.
+ * 
  * stopConditions must be terminated with a PTX_StruxDummy entry like:
  * PTStruxType stopCondition[] = { PTX_SectionTable, PTX_StruxDummy };
  * 
@@ -115,11 +116,13 @@ pf_Frag_Strux* pt_PieceTable::_findLastStruxOfType( pf_Frag * pfStart,
 		if(pf->getType() == pf_Frag::PFT_Strux)
 		{
 			pf_Frag_Strux * pfs2 = static_cast<pf_Frag_Strux*>(pf);
+            PTStruxType eStruxType = pfs2->getStruxType();
 
-			if(pfs2->getStruxType() == pst)
+			if( eStruxType == pst)
                 return pfs2;
+            
             if( stopConditionsEnd !=
-                std::find( stopConditionsBegin, stopConditionsEnd, pfs2->getStruxType() ))
+                std::find( stopConditionsBegin, stopConditionsEnd, eStruxType ))
             {
                 return 0;
             }
@@ -212,7 +215,7 @@ pf_Frag_Strux* pt_PieceTable::_findLastStruxOfType( pf_Frag * pfStart,
 }
 
 
-pf_Frag * pt_PieceTable::_findLastStruxOfType(pf_Frag * pfStart, PTStruxType pst, bool bSkipEmbededSections)
+pf_Frag_Strux* pt_PieceTable::_findLastStruxOfType(pf_Frag * pfStart, PTStruxType pst, bool bSkipEmbededSections)
 {
 	UT_return_val_if_fail( pfStart, NULL );
     PTStruxType stopCondition[] = { PTX_StruxDummy };

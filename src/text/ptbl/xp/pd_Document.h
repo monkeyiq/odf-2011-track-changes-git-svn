@@ -546,6 +546,7 @@ PT_AttrPropIndex            getAPIFromSOH(PL_ObjectHandle odh);
 												 UT_sint32 row, 
 												 UT_sint32 col);
 	void                    miniDump(PL_StruxDocHandle sdh, UT_sint32 nstruxes);
+    bool                    dumpDoc( const char* msg, PT_DocPosition currentpos, PT_DocPosition endpos );
 
 	bool                    isInsertHyperLinkValid(PT_DocPosition pos) const;
 

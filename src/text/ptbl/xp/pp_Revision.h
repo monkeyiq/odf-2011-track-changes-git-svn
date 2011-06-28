@@ -72,7 +72,9 @@ class ABI_EXPORT PP_Revision: public PP_AttrProp
 	bool operator == (const PP_Revision &op2) const;
 
 //    PP_Revision* clone() const;
-    
+
+    std::string toString() const;
+
   private:
 	void             _refreshString() const;
 	bool             _handleNestedRevAttr();
@@ -159,6 +161,7 @@ class ABI_EXPORT PP_RevisionAttr
 	const PP_Revision *   getLastRevision() const;
 	const PP_Revision *   getRevisionWithId(UT_uint32 iId, UT_uint32 & iMinId) const;
 
+    UT_uint32             getHighestId() const;
 	UT_uint32             getRevisionsCount() const {return m_vRev.getItemCount();}
 	const PP_Revision *   getNthRevision(UT_uint32 n) const {return (const PP_Revision*)m_vRev.getNthItem(n);}
 	
@@ -194,6 +197,8 @@ class ABI_EXPORT PP_RevisionAttr
     void mergeAll( const PP_RevisionAttr& ra );
     void mergeAttr( UT_uint32 iId, PP_RevisionType t,
                     const gchar* pzName, const gchar* pzValue );
+    void mergeAttrIfNotAlreadyThere( UT_uint32 iId, PP_RevisionType t,
+                                     const gchar* pzName, const gchar* pzValue );
     
   private:
 	void _init(const gchar *r);

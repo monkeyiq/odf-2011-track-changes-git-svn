@@ -528,8 +528,10 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
 
                 if( last->getType() == PP_REVISION_DELETION )
                 {
-                    UT_DEBUGMSG(("Text_Listener::openSpan() last is DEL, isParaDeleted:%d last-c-pos:%d pos:%d\n",
+                    UT_DEBUGMSG(("Text_Listener::openSpan() last is DEL, isParaDeleted:%d sd:%d ed:%d   last-c-pos:%d pos:%d\n",
                                  ctp->getData().isParagraphDeleted(),
+                                 ctp->getData().isParagraphStartDeleted(),
+                                 ctp->getData().isParagraphEndDeleted(),
                                  getCurrentDocumentPosition(),
                                  ctp->getData().m_lastSpanPosition ));
                     
@@ -2546,7 +2548,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
                 dm.setState( ODe_ChangeTrackingDeltaMerge::DM_TRAILING );
                 output += dm.flushBuffer();
                 dm.close();
-                startOfParagraphWasDeletedPostamble << dm.flushBuffer() << "<!-- spd and not whole p -->";
+                startOfParagraphWasDeletedPostamble << dm.flushBuffer() << "<!-- start-para-deleted and not( whole-para-deleted ) -->";
                 // std::string rmChangeID = m_rAuxiliaryData.toChangeID( ctp->getData().m_maxParaDeletedRevision );
                 // std::stringstream ss;
                 // ss << "<delta:merge o=\"1\" delta:removal-change-idref=\"" << rmChangeID << "\"> " << endl

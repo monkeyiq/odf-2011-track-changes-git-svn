@@ -60,6 +60,12 @@ ODe_ChangeTrackingParagraph_Data::updatePara( const PP_RevisionAttr* ra )
             UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::updatePara(T) start-deleted:%d\n", v ));
             m_paraStartDeletedRevision = v;
         }
+        if( UT_uint32 v = UT_getAttributeTyped<UT_uint32>( r, ABIATTR_PARA_DELETED_REVISION, 0 ))
+        {
+            UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::updatePara(T) deleted:%d\n", v ));
+            m_paraDeletedRevision = v;
+        }
+
     }
     
     UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::updatePara() DONE\n" ));
@@ -233,10 +239,11 @@ ODe_ChangeTrackingParagraph_Data::isParagraphEndDeleted()
 bool
 ODe_ChangeTrackingParagraph_Data::isParagraphDeleted()
 {
-    UT_DEBUGMSG(("isParagraphDeleted: m_maxRevision:%d m_maxDeletedRevision:%d all-spans-same-rev:%d\n",
-                 m_maxRevision, m_maxDeletedRevision, m_allSpansAreSameVersion ));
+    UT_DEBUGMSG(("isParagraphDeleted: m_del:%d m_maxRevision:%d m_maxDeletedRevision:%d all-spans-same-rev:%d\n",
+                 m_paraDeletedRevision, m_maxRevision, m_maxDeletedRevision, m_allSpansAreSameVersion ));
 
-    return isParagraphStartDeleted() && isParagraphEndDeleted();
+    return m_paraDeletedRevision ||
+        (isParagraphStartDeleted() && isParagraphEndDeleted());
     
     
     // // table cells might have <c></c> elements with no revision numbers in them

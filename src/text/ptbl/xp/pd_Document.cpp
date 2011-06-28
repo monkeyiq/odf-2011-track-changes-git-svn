@@ -3325,7 +3325,15 @@ void  PD_Document::miniDump(PL_StruxDocHandle sdh, UT_sint32 nstruxes)
 	UT_UNUSED(nstruxes);
 #endif
 }
-		
+
+
+bool
+PD_Document::dumpDoc( const char* msg, PT_DocPosition currentpos, PT_DocPosition endpos )
+{
+    return m_pPieceTable->dumpDoc( msg, currentpos, endpos );
+}
+
+
 
 /*!
  * The method returns the SDH of the cell at the location given by (rows,columns) in table 

@@ -24,6 +24,7 @@
 #include "ut_debugmsg.h"
 #include "ut_misc.h"
 
+#include "ut_std_map.h"
 //#include <limits.h>
 
 #include <sstream>
@@ -246,6 +247,40 @@ void PP_Revision::_refreshString() const
 
 	m_bDirty = false;
 }
+
+std::string PP_Revision::toString() const
+{
+    std::stringstream ret;
+    PP_RevisionType r_type = getType();
+
+    if(r_type == PP_REVISION_FMT_CHANGE)
+        ret << "!";
+
+    // print the id with appropriate sign
+    ret << (int)(getId()* ((r_type == PP_REVISION_DELETION)?-1:1));
+    
+    if(r_type != PP_REVISION_DELETION)
+    {
+        // if we have no props but have attribs, we have to issue empty braces so as not to
+        // confuse attribs with props
+        if(hasProperties() || hasAttributes())
+            ret << "{";
+        
+        if(hasProperties())
+            ret << getPropsString();
+        
+        if(hasProperties() || hasAttributes())
+            ret << "}";
+			
+        if(hasAttributes())
+        {
+            ret << "{" << getAttrsString() << "}";
+        }
+    }
+    
+    return ret.str();
+}
+
 
 bool PP_Revision::operator == (const PP_Revision &op2) const
 {
@@ -745,6 +780,18 @@ const PP_Revision * PP_RevisionAttr::getLastRevision() const
 	return m_pLastRevision;
 }
 
+UT_uint32 PP_RevisionAttr::getHighestId() const
+{
+    UT_uint32 ret = 0;
+	for(UT_sint32 i = 0; i < m_vRev.getItemCount(); i++)
+	{
+		const PP_Revision * t = (const PP_Revision *)m_vRev.getNthItem(i);
+        ret = std::max( ret, t->getId() );
+    }
+    return ret;
+}
+
+
 /*!
    find revision with id == iId; if revision is not found minId
    contains the smallest id in this set greater than iId; if return value is and minId
@@ -981,34 +1028,195 @@ void PP_RevisionAttr::mergeAttr( UT_uint32 iId, PP_RevisionType t,
     mergeAll( ra );
 }
 
+/**
+ * Do not replace the attribute/value if it exists in the given revision already.
+ */
+void PP_RevisionAttr::mergeAttrIfNotAlreadyThere( UT_uint32 iId, PP_RevisionType t,
+                                                  const gchar* pzName, const gchar* pzValue )
+{
+	for(UT_sint32 i = 0; i < m_vRev.getItemCount(); i++)
+	{
+		const PP_Revision * tr = (const PP_Revision *)m_vRev.getNthItem(i);
+		UT_uint32 tid = tr->getId();
+
+        if( tid == iId )
+        {
+            if( t == PP_REVISION_NONE || t == tr->getType() )
+            {
+                const gchar * tattrs = tr->getAttrsString();
+                if( !strstr( tattrs, ABIATTR_PARA_DELETED_REVISION ))
+                {
+                    return;
+                }
+            }
+        }
+    }
+    
+    return mergeAttr( iId, t, pzName, pzValue );
+}
+
+
+
+//
+//                           getId()    getType()                rev
+typedef std::map< std::pair< UT_uint32, PP_RevisionType >, const PP_Revision* > revidx_t;
+
+static revidx_t toIndex( const PP_RevisionAttr& ra )
+{
+    revidx_t ret;
+    for( UT_uint32 i=0; i < ra.getRevisionsCount(); ++i )
+    {
+        const PP_Revision* r = ra.getNthRevision( i );
+        ret[ std::make_pair( r->getId(), r->getType() ) ] = r;
+    }
+    return ret;
+}
+
+static std::string mergeAPStrings( const std::string& a, const std::string& b )
+{
+    if( b.empty() )
+        return a;
+    if( a.empty() )
+        return b;
+    std::stringstream ss;
+    ss << a << ";" << b;
+    return ss.str();
+}
+
+
+#define DEBUG_MERGEALL false
 
 void PP_RevisionAttr::mergeAll( const PP_RevisionAttr& ra )
 {
     PP_RevisionAttr us( getXMLstring() );
     _clear();
-
     std::string tmp = (std::string)us.getXMLstring() + "," + ra.getXMLstring();
-    setRevision( tmp.c_str() );
-    return;
+
+    /*
+     * This is a heavy debug block for testing.
+     */
+    if( DEBUG_MERGEALL )
+    {
+        UT_DEBUGMSG(("ODTCT ra::merge() ===================\n" ));
+        UT_DEBUGMSG(("ODTCT ra::merge() old:%s\n", us.getXMLstring() ));
+        UT_DEBUGMSG(("ODTCT ra::merge() new:%s\n", ra.getXMLstring() ));
+        UT_DEBUGMSG(("ODTCT ra::merge() ret:%s\n", tmp.c_str()  ));
+        for( int i=0; i < us.getRevisionsCount(); ++i )
+        {
+            const PP_Revision* r = us.getNthRevision( i );
+            UT_DEBUGMSG(("ODTCT ra::merge() old r:%d id:%d t:%d attr:%s\n", i, r->getId(), r->getType(), r->getAttrsString() ));
+            UT_DEBUGMSG(("ODTCT ra::merge() old r:%d id:%d t:%d prop:%s\n", i, r->getId(), r->getType(), r->getPropsString() ));
+        }
+        for( int i=0; i < ra.getRevisionsCount(); ++i )
+        {
+            const PP_Revision* r = ra.getNthRevision( i );
+            UT_DEBUGMSG(("ODTCT ra::merge() new r:%d id:%d t:%d attr:%s\n", i, r->getId(), r->getType(), r->getAttrsString() ));
+            UT_DEBUGMSG(("ODTCT ra::merge() new r:%d id:%d t:%d prop:%s\n", i, r->getId(), r->getType(), r->getPropsString() ));
+        }
+    }
+    
+    revidx_t oldidx = toIndex( us );
+    revidx_t newidx = toIndex( ra );
+
+    /*
+     * Iterate over the entries in the oldidx merging the data from
+     * newidx if found whenever a entry from newidx is used it is
+     * removed from newidx too. This way, we can then just iterate
+     * over newidx to add the entries which are in newidx but not in
+     * oldidx.
+     */
+    revidx_t output;
+    for( revidx_t::iterator iter = oldidx.begin(); iter != oldidx.end(); ++iter )
+    {
+        const PP_Revision* r = iter->second;
+        revidx_t::iterator niter = newidx.find( iter->first );
+        // UT_DEBUGMSG(("ODTCT ra::merge() id:%d attrs:%s props:%s\n",
+        //              r->getId(), r->getAttrsString(), r->getPropsString() ));
+
+        /*
+         * If there is an entry in oldidx and newidx then merge them
+         */
+        if( niter != newidx.end() )
+        {
+            const PP_Revision* nr = niter->second;
+            
+            std::string attrs = mergeAPStrings( r->getAttrsString(), nr->getAttrsString() );
+            std::string props = mergeAPStrings( r->getPropsString(), nr->getPropsString() );
+            output[ iter->first ] = new PP_Revision( iter->first.first,
+                                                     iter->first.second,
+                                                     props.c_str(), attrs.c_str() );
+            newidx.erase( niter );
+        }
+        else
+        {
+            /*
+             * disregard entries without anything to tell
+             */
+            if( r->getType() != PP_REVISION_DELETION
+                && !strlen(r->getAttrsString())
+                && !strlen(r->getPropsString()) )
+            {
+                // UT_DEBUGMSG(("ODTCT ra::merge() rev as no attr/props, skipping old id:%d type:%d\n",
+                //              r->getId(), r->getType() ));
+                
+                continue;
+            }
+
+            /*
+             * no matching entry in the newidx, just copy the data
+             */
+            output[ iter->first ] = new PP_Revision( iter->first.first,
+                                                     iter->first.second,
+                                                     r->getPropsString(),
+                                                     r->getAttrsString() );
+        }
+    }
+    
+    /*
+     * copy over new revisions which didn't have a matching entry in the oldidx
+     */
+    for( revidx_t::iterator iter = newidx.begin(); iter != newidx.end(); ++iter )
+    {
+            output[ iter->first ] = new PP_Revision( iter->first.first,
+                                                     iter->first.second,
+                                                     iter->second->getPropsString(),
+                                                     iter->second->getAttrsString() );
+    }
+
+    /*
+     * Build the XML string for the merged revision attribute from the output index
+     */
+    bool outputssVirgin = true;
+    std::stringstream outputss;
+    for( revidx_t::iterator iter = output.begin(); iter != output.end(); ++iter )
+    {
+        const PP_Revision* r = iter->second;
+
+        if( DEBUG_MERGEALL )
+        {
+            UT_DEBUGMSG(("ODTCT ra::merge() output id:%d t:%d attr:%s\n",
+                         r->getId(), r->getType(), r->getAttrsString() ));
+            UT_DEBUGMSG(("ODTCT ra::merge() output id:%d t:%d prop:%s\n",
+                         r->getId(), r->getType(), r->getPropsString() ));
+        }
+        
+        if( outputssVirgin ) outputssVirgin = false;
+        else                 outputss << ",";
+        
+        outputss << r->toString();
+    }
+    UT_map_delete_all_second( output );
     
 
-    // const PP_Revision* r = 0;
-    // for( int raIdx = 0;
-    //      raIdx < us.getRevisionsCount() && (r = us.getNthRevision( raIdx ));
-    //      raIdx++ )
-    // {
-    //     m_vRev.addItem((void*)r->clone());
-    // }
-    // for( int raIdx = 0;
-    //      raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
-    //      raIdx++ )
-    // {
-    //     m_vRev.addItem((void*)r->clone());
-    // }
     
-    // m_bDirty = true;
-	// m_iSuperfluous = 0;
-	// m_pLastRevision = NULL;
+    setRevision( outputss.str().c_str() );
+
+    if( DEBUG_MERGEALL )
+    {
+        UT_DEBUGMSG(("ODTCT ra::merge() outputss::%s\n", outputss.str().c_str() ));
+        UT_DEBUGMSG(("ODTCT ra::merge() ret:%s\n", getXMLstring() ));
+    }
+    return;
 }
 
 
@@ -1126,41 +1334,49 @@ void PP_RevisionAttr::_refreshString() const
 	for(UT_uint32 i = 0; i < iCount; i++)
 	{
 		PP_Revision * r = (PP_Revision *)m_vRev.getNthItem(i);
-		PP_RevisionType r_type = r->getType();
 
-		if(r_type == PP_REVISION_FMT_CHANGE)
-			m_sXMLstring += "!";
+        if( !m_sXMLstring.empty() )
+            m_sXMLstring += ",";
 
-		// print the id with appropriate sign
-		sprintf(buf,"%d",r->getId()* ((r_type == PP_REVISION_DELETION)?-1:1));
-		m_sXMLstring += buf;
+        m_sXMLstring += r->toString();
+            
+		// PP_Revision * r = (PP_Revision *)m_vRev.getNthItem(i);
+		// PP_RevisionType r_type = r->getType();
 
-		if(r_type != PP_REVISION_DELETION)
-		{
-			// if we have no props but have attribs, we have to issue empty braces so as not to
-			// confuse attribs with props
-			if(r->hasProperties() || r->hasAttributes())
-				m_sXMLstring += "{";
+        
+		// if(r_type == PP_REVISION_FMT_CHANGE)
+		// 	m_sXMLstring += "!";
+
+		// // print the id with appropriate sign
+		// sprintf(buf,"%d",r->getId()* ((r_type == PP_REVISION_DELETION)?-1:1));
+		// m_sXMLstring += buf;
+
+		// if(r_type != PP_REVISION_DELETION)
+		// {
+		// 	// if we have no props but have attribs, we have to issue empty braces so as not to
+		// 	// confuse attribs with props
+		// 	if(r->hasProperties() || r->hasAttributes())
+		// 		m_sXMLstring += "{";
 			
-			if(r->hasProperties())
-				m_sXMLstring += r->getPropsString();
+		// 	if(r->hasProperties())
+		// 		m_sXMLstring += r->getPropsString();
 			
-			if(r->hasProperties() || r->hasAttributes())
-				m_sXMLstring += "}";
+		// 	if(r->hasProperties() || r->hasAttributes())
+		// 		m_sXMLstring += "}";
 			
-			if(r->hasAttributes())
-			{
-				m_sXMLstring += "{";
-				m_sXMLstring += r->getAttrsString();
-				m_sXMLstring += "}";
-			}
-		};
+		// 	if(r->hasAttributes())
+		// 	{
+		// 		m_sXMLstring += "{";
+		// 		m_sXMLstring += r->getAttrsString();
+		// 		m_sXMLstring += "}";
+		// 	}
+		// };
 
-		if(i != iCount - 1)
-		{
-			//not the last itteration, append ','
-			m_sXMLstring += ",";
-		}
+		// if(i != iCount - 1)
+		// {
+		// 	//not the last itteration, append ','
+		// 	m_sXMLstring += ",";
+		// }
 
 	}
 	m_bDirty = false;

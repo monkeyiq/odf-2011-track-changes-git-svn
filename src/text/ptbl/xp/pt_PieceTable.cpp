@@ -699,6 +699,14 @@ bool pt_PieceTable::getBlockBuf(PL_StruxDocHandle sdh,
     return true;
 }
 
+PT_DocPosition pt_PieceTable::getPosEnd()
+{
+    PT_DocPosition ret = 0;
+    getBounds( true, ret );
+    return ret;
+}
+
+
 bool pt_PieceTable::getBounds(bool bEnd, PT_DocPosition & docPos) const
 {
 	// be optimistic
