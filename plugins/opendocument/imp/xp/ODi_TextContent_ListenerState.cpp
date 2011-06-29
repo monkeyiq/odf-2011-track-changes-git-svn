@@ -595,11 +595,7 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
         m_pAbiDocument->appendFmt(&m_vecInlineFmt);
 
         PP_RevisionAttr ctRevision;
-        const gchar ** pAttrs = 0;
-        const gchar ** pProps = 0;
-        ctRevision.addRevision( fromChangeID(m_mergeIDRef),
-                                PP_REVISION_DELETION,
-                                pAttrs, pProps );
+        ctRevision.addRevision( fromChangeID(m_mergeIDRef), PP_REVISION_DELETION );
 
         if( strlen(ctRevision.getXMLstring()) )
         {
@@ -901,26 +897,20 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
         
         UT_DEBUGMSG(("delta:inserted-text-start tid:%s idref:%s\n", ctTextID.c_str(), idref.c_str()));
         UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", idref.c_str() ));
-        const gchar ** pAttrs = 0;
-        const gchar ** pProps = 0;
         if( !idref.empty() )
         {
-            ctRevision.addRevision( fromChangeID(idref),
-                                    PP_REVISION_ADDITION,
-                                    pAttrs, pProps );
+            ctRevision.addRevision( fromChangeID(idref), PP_REVISION_ADDITION );
         }
         else
         {
-            ctRevision.addRevision( fromChangeID(ctTextID),
-                                    PP_REVISION_ADDITION,
-                                    pAttrs, pProps );
+            ctRevision.addRevision( fromChangeID(ctTextID), PP_REVISION_ADDITION );
         }
+        
         if( const ODi_StartTag* st = m_rElementStack.getClosestElement( "delta:removed-content" ))
         {
             if( const char* v = st->getAttributeValue( "delta:removal-change-idref" ))
             {
-                ctRevision.addRevision( fromChangeID(v),
-                                        PP_REVISION_DELETION, pAttrs, pProps );
+                ctRevision.addRevision( fromChangeID(v), PP_REVISION_DELETION );
             }
         }
         
@@ -992,19 +982,14 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                                  idrefstr, ctMostRecentWritingVersion.c_str() ));
                     x = ctMostRecentWritingVersion.c_str();
                     wid = fromChangeID(x);
-                    const gchar ** pAttrs = 0;
-                    const gchar ** pProps = 0;
-                    ctRevision.addRevision( wid,
-                                            PP_REVISION_ADDITION, pAttrs, pProps );
+                    ctRevision.addRevision( wid, PP_REVISION_ADDITION );
                 }
 
                 std::string ctMostRecentDeleteVersion = ctAddRemoveStackGetLast( PP_REVISION_DELETION );
                 if( fromChangeID(ctMostRecentDeleteVersion) > wid )
                 {
-                    const gchar ** pAttrs = 0;
-                    const gchar ** pProps = 0;
                     ctRevision.addRevision( fromChangeID(ctMostRecentDeleteVersion),
-                                            PP_REVISION_DELETION, pAttrs, pProps );
+                                            PP_REVISION_DELETION );
                 }
 
                 //
@@ -2733,17 +2718,17 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         //
         if( m_mergeIsInsideTrailingPartialContent || m_mergeIsInsideIntermediateContent )
         {
-            const gchar* ppAtts[10];
-            ppAtts[0] = ABIATTR_PARA_START_DELETED_REVISION;
-            ppAtts[1] = m_mergeIDRef.c_str();
-            ppAtts[2] = 0;
+            propertyArray<> ppAtts;
+            ppAtts.push_back( ABIATTR_PARA_START_DELETED_REVISION );
+            ppAtts.push_back( m_mergeIDRef.c_str() );
             if( m_mergeIsInsideIntermediateContent )
             {
-                ppAtts[2] = ABIATTR_PARA_END_DELETED_REVISION;
-                ppAtts[3] = m_mergeIDRef.c_str();
-                ppAtts[4] = 0;
+                ppAtts.push_back( ABIATTR_PARA_END_DELETED_REVISION );
+                ppAtts.push_back( m_mergeIDRef.c_str() );
+                ppAtts.push_back( ABIATTR_PARA_DELETED_REVISION );
+                ppAtts.push_back( m_mergeIDRef.c_str() );
             }
-            ctRevision.addRevision(1,PP_REVISION_FMT_CHANGE,ppAtts,NULL);
+            ctRevision.addRevision(1,PP_REVISION_ADDITION_AND_FMT,ppAtts.data(),NULL);
         }
         
 
@@ -2752,20 +2737,16 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             if( !ctInsertionChangeIDRef.empty() )
             {
                 UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add startparaA rev:%s\n", ctInsertionChangeIDRef.c_str() ));
-                const gchar ** pAttrs = 0;
-                const gchar ** pProps = 0;
                 ctRevision.addRevision( getIntroducingVersion( fromChangeID(ctInsertionChangeIDRef), ctRevision ),
-                                        PP_REVISION_ADDITION, pAttrs, pProps );
+                                        PP_REVISION_ADDITION );
 //                m_ctMostRecentWritingVersion = ctInsertionChangeIDRef;
             }
         }
         if( m_ctParagraphDeletedRevision != -1 )
         {
             UT_DEBUGMSG(("ODTCT ctRevision.addRevision() del startpara1 rev:%d\n", m_ctParagraphDeletedRevision ));
-            const gchar ** pAttrs = 0;
-            const gchar ** pProps = 0;
 //            ctRevision.addRevision( m_ctParagraphDeletedRevision,
-//                                    PP_REVISION_DELETION, pAttrs, pProps );
+//                                    PP_REVISION_DELETION );
         }
         if( !m_mergeIDRef.empty() )
         {
@@ -2776,10 +2757,7 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             }
             else
             {
-                const gchar ** pAttrs = 0;
-                const gchar ** pProps = 0;
-                ctRevision.addRevision( fromChangeID(m_mergeIDRef),
-                                        PP_REVISION_DELETION, pAttrs, pProps );
+                ctRevision.addRevision( fromChangeID(m_mergeIDRef), PP_REVISION_DELETION );
             }
         }
         
@@ -3016,54 +2994,25 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             }
 
 
+            if( m_ctParagraphDeletedRevision != -1 )
+            {
+                UT_DEBUGMSG(("ODTCT ctRevision.addRevision() delparaA rev:%d\n", m_ctParagraphDeletedRevision ));
+                UT_DEBUGMSG(("ODTCT ctRevision.addRevision() ctrevA:%s\n", ctRevision.getXMLstring() ));
+                ctRevision.mergeAttrIfNotAlreadyThere( 1, PP_REVISION_ADDITION_AND_FMT,
+                                                       ABIATTR_PARA_DELETED_REVISION,
+                                                       tostr(m_ctParagraphDeletedRevision).c_str() );
+                
+                UT_DEBUGMSG(("ODTCT ctRevision.addRevision() ctrevB:%s\n", ctRevision.getXMLstring() ));
+            }
+            
             if( strlen(ctRevision.getXMLstring()) )
             {
                 if( strcmp(ctRevision.getXMLstring(), "0"))
                 {
-//                     m_pAbiDocument->setShowRevisions( true );			
-//                     m_pAbiDocument->setMarkRevisions( true );
-// //                    m_pAbiDocument->setShowRevisionId(PD_MAX_REVISION);
-//                     m_pAbiDocument->setShowRevisionId(3);
-
-//                     static int v = 1;
-//                     if( v )
-//                     {
-//                         v = false;
-
-//                         int m_currentRevisionId = 1;
-//                         int m_currentRevisionTime = 0;
-//                         int m_currentRevisionVersion = 1;
-                        
-//                         m_pAbiDocument->addRevision( m_currentRevisionId, NULL, 0,
-//                                                      m_currentRevisionTime,
-//                                                      m_currentRevisionVersion, true);
-//                         ++m_currentRevisionId;
-//                         ++m_currentRevisionVersion;
-//                         m_pAbiDocument->addRevision( m_currentRevisionId, NULL, 0,
-//                                                      m_currentRevisionTime,
-//                                                      m_currentRevisionVersion, true);
-//                         ++m_currentRevisionId;
-//                         ++m_currentRevisionVersion;
-//                         m_pAbiDocument->addRevision( m_currentRevisionId, NULL, 0,
-//                                                      m_currentRevisionTime,
-//                                                      m_currentRevisionVersion, true);
-                        
-                        
-//                     }
-                    
                     if( strcmp( ctRevision.getXMLstring(), "0" ))
                     {
                         ppAtts[i++] = PT_REVISION_ATTRIBUTE_NAME;
-                        if( !m_mergeIDRef.empty() )
-                        {
-                            UT_DEBUGMSG(("ODTCT ADD FORCED to 1,-2\n" ));
-                            ppAtts[i++] = ctRevision.getXMLstring();
-//                          ppAtts[i++] = "1,-2";
-                        }
-                        else
-                        {
-                            ppAtts[i++] = ctRevision.getXMLstring();
-                        }
+                        ppAtts[i++] = ctRevision.getXMLstring();
                     }
                     
                     UT_DEBUGMSG(("ODTCT ADD paraRevision:%s\n", ctRevision.getXMLstring() ));
@@ -3112,27 +3061,23 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             PP_RevisionAttr ctRevision;
             {
                 UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add startpara rev:%s\n", ctMostRecentWritingVersion.c_str() ));
-                const gchar ** pAttrs = 0;
-                const gchar ** pProps = 0;
                 ctRevision.addRevision( getIntroducingVersion( fromChangeID(ctMostRecentWritingVersion), ctRevision ),
-                                        PP_REVISION_ADDITION, pAttrs, pProps );
+                                        PP_REVISION_ADDITION );
             }
             if( m_ctParagraphDeletedRevision != -1 )
             {
                 UT_DEBUGMSG(("ODTCT ctRevision.addRevision() del startpara2 rev:%d\n", m_ctParagraphDeletedRevision ));
-                const gchar ** pAttrs = 0;
-                const gchar ** pProps = 0;
-                ctRevision.addRevision( m_ctParagraphDeletedRevision,
-                                        PP_REVISION_DELETION, pAttrs, pProps );
+                ctRevision.addRevision( m_ctParagraphDeletedRevision, PP_REVISION_DELETION );
+                ctRevision.mergeAttrIfNotAlreadyThere( 1, PP_REVISION_ADDITION_AND_FMT,
+                                                       ABIATTR_PARA_DELETED_REVISION,
+                                                       tostr(m_ctParagraphDeletedRevision).c_str() );
+                
             }
             if( !m_mergeIDRef.empty() )
             {
                 UT_DEBUGMSG(("ODTCT ctRevision.addRevision() del startpara rev:%s\n",
                              m_mergeIDRef.c_str() ));
-                const gchar ** pAttrs = 0;
-                const gchar ** pProps = 0;
-                ctRevision.addRevision( fromChangeID(m_mergeIDRef),
-                                        PP_REVISION_DELETION, pAttrs, pProps );
+                ctRevision.addRevision( fromChangeID(m_mergeIDRef), PP_REVISION_DELETION );
                 
             }
 
@@ -3146,15 +3091,8 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             //     revString = m_ctRevisionIDBeforeMergeBlock.c_str();
             // }
             // else
-            if( !m_mergeIDRef.empty() )
-            {
-//                revString = "1,-2";
-                revString = ctRevision.getXMLstring();
-            }
-            else
-            {
-                revString = ctRevision.getXMLstring();
-            }
+
+            revString = ctRevision.getXMLstring();
             
             
             const gchar* ppAtts[20];
@@ -3165,7 +3103,6 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
                 ppAtts[i++] = PT_REVISION_ATTRIBUTE_NAME;
                 if( !m_mergeIDRef.empty() )
                 {
-                    UT_DEBUGMSG(("ODTCT ADD FORCED to 1,-2\n" ));
                     ppAtts[i++] = revString.c_str();
                     ppAtts[i++] = "foo";
                     ppAtts[i++] = "bar";
@@ -3194,7 +3131,8 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         // We now accept text
         m_bAcceptingText = true;
 
-        if (m_pendingNoteAnchorInsertion) {
+        if (m_pendingNoteAnchorInsertion)
+        {
             m_pendingNoteAnchorInsertion = false;
 
             UT_return_if_fail(!m_currentNoteId.empty());
@@ -3408,9 +3346,7 @@ ODi_TextContent_ListenerState::ctAddRemoveStackSetup( PP_RevisionAttr& ra, m_ctA
         UT_DEBUGMSG(("type:%d ver:%s\n", iter->first, iter->second.c_str() ));
         if( !iter->second.empty() )
         {
-            const gchar ** pAttrs = 0;
-            const gchar ** pProps = 0;
-            ra.addRevision( fromChangeID( iter->second ), iter->first, pAttrs, pProps );
+            ra.addRevision( fromChangeID( iter->second ), iter->first );
         }
     }
     return ra;

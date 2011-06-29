@@ -991,6 +991,20 @@ void PP_RevisionAttr::addRevision(UT_uint32 iId, PP_RevisionType eType,
 	m_pLastRevision = NULL;
 }
 
+/**
+ * Logically Performs addRevision( iId, eType, 0, 0 ). This method is
+ * mainly useful for loading an ODT+GCT file where you want to add and
+ * delete revisions but don't actually care about the attrs/props for
+ * that action.
+ */
+void PP_RevisionAttr::addRevision(UT_uint32 iId, PP_RevisionType eType )
+{
+    const gchar ** pAttrs = 0;
+    const gchar ** pProps = 0;
+    addRevision( iId, eType, pAttrs, pProps );
+}
+
+
 void
 PP_RevisionAttr::addRevision( const PP_Revision* r )
 {
@@ -1044,7 +1058,7 @@ void PP_RevisionAttr::mergeAttrIfNotAlreadyThere( UT_uint32 iId, PP_RevisionType
             if( t == PP_REVISION_NONE || t == tr->getType() )
             {
                 const gchar * tattrs = tr->getAttrsString();
-                if( !strstr( tattrs, ABIATTR_PARA_DELETED_REVISION ))
+                if( strstr( tattrs, pzName ))
                 {
                     return;
                 }

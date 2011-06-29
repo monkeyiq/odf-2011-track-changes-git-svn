@@ -141,6 +141,7 @@ class ABI_EXPORT PP_RevisionAttr
 									  PP_RevisionType eType,
 									  const gchar ** pAttrs,
 									  const gchar ** pProps);
+	void                  addRevision(UT_uint32 iId, PP_RevisionType eType );
 
     // No ownership of the given revision is taken. 
     void                  addRevision( const PP_Revision* r );
