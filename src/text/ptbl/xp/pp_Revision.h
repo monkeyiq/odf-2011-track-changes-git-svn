@@ -200,6 +200,8 @@ class ABI_EXPORT PP_RevisionAttr
                     const gchar* pzName, const gchar* pzValue );
     void mergeAttrIfNotAlreadyThere( UT_uint32 iId, PP_RevisionType t,
                                      const gchar* pzName, const gchar* pzValue );
+
+	const PP_Revision *   getLowestDeletionRevision() const;
     
   private:
 	void _init(const gchar *r);

@@ -253,7 +253,7 @@ ODe_Style_Style::getTextStyleProps( const PP_AttrProp* pAP,
 
     if ( ODe_Style_Style::hasTextStyleProps(pAP) )
     {
-        UT_DEBUGMSG(("xx1 has-style-props\n" ));
+//        UT_DEBUGMSG(("xx1 has-style-props\n" ));
         // Need to create a new automatic style to hold those paragraph
         // properties.
         
@@ -295,8 +295,8 @@ bool ODe_Style_Style::hasTextStyleProps( const PP_AttrProp* pAP, bool checkRevis
     const gchar* pValue;
     bool ok;
 
-    UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps() checkRevisionAttr:%d has rev:%d\n",
-                 checkRevisionAttr, pAP->getAttribute("revision", pValue) ));
+//    UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps() checkRevisionAttr:%d has rev:%d\n",
+//                 checkRevisionAttr, pAP->getAttribute("revision", pValue) ));
     
     ok = pAP->getProperty("color", pValue);
     if (ok && pValue != NULL) {
@@ -356,10 +356,10 @@ bool ODe_Style_Style::hasTextStyleProps( const PP_AttrProp* pAP, bool checkRevis
     if( checkRevisionAttr )
     {
         ok = pAP->getAttribute("revision", pValue);
-        UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps rev-ok:%d\n", ok ));
+//        UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps rev-ok:%d\n", ok ));
         if (ok && pValue)
         {
-            UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps rev:%s\n", pValue ));
+//            UT_DEBUGMSG(("ODe_Style_Style::hasTextStyleProps rev:%s\n", pValue ));
             PP_RevisionAttr ra( pValue );
             const PP_Revision* r = 0;
             for( int raIdx = ra.getRevisionsCount()-1;

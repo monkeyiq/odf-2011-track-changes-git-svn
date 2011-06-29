@@ -118,6 +118,79 @@ ODe_ChangeTrackingParagraph_Listener::openSpan( const PP_AttrProp* pAP )
             UT_DEBUGMSG(("ODe_CTPara_Listener::openSpan() last-revision-number:%d\n", last->getId() ));
 
         m_current->getData().update( &ra, getCurrentDocumentPosition() );
+
+        if( ra.getRevisionsCount() )
+        {
+            ODe_ChangeTrackingParagraph_Data& d = m_current->getData();
+
+            const PP_Revision* last = ra.getLowestDeletionRevision();
+            if( !last )
+            {
+                d.m_firstSpanWhichCanStartDeltaMergePos = 0;
+                d.m_firstSpanWhichCanStartDeltaMergeRevision = 0;
+            }
+            else
+            {
+                ODe_ChangeTrackingParagraph_Data& d = m_current->getData();
+                UT_DEBUGMSG(("ODe_CTPara_Listener::openSpan() updating DeltaMergePos(TOP)\n" ));
+                UT_DEBUGMSG(("ODe_CTPara_Listener::openSpan() wv:%d sv:%d ev:%d\n",
+                             d.getParagraphDeletedVersion(),
+                             d.getParagraphStartDeletedVersion(),
+                             d.getParagraphEndDeletedVersion()
+                                ));
+                UT_DEBUGMSG(("ODe_CTPara_Listener::openSpan() isdel:%d last->id:%d cpos:%d dmpos:%d\n",
+                             (last->getType() == PP_REVISION_DELETION),
+                             last->getId(),
+                             getCurrentDocumentPosition(),
+                             d.m_firstSpanWhichCanStartDeltaMergePos
+                                ));
+                UT_DEBUGMSG(("ODe_CTPara_Listener::openSpan(2) isdel:%d last->id:%d cpos:%d dmpos:%d\n",
+                             (last->getType() == PP_REVISION_DELETION),
+                             last->getId(),
+                             getCurrentDocumentPosition(),
+                             d.m_firstSpanWhichCanStartDeltaMergePos
+                                ));
+
+                if( last->getId() != d.getParagraphEndDeletedVersion() )
+                {
+                    //
+                    // not the right revision for the end of the current para
+                    //
+                    UT_DEBUGMSG(("ODe_CTPara_Listener::openSpan(n) not same version as ev\n" ));
+                    d.m_firstSpanWhichCanStartDeltaMergePos = 0;
+                    d.m_firstSpanWhichCanStartDeltaMergeRevision = 0;
+                }
+                else
+                {
+                    UT_DEBUGMSG(("ODe_CTPara_Listener::openSpan(y) updating for ev!\n" ));
+                    //
+                    // this is span which is deleted at the same revision as
+                    // the end of para marker.
+                    //
+                    if( !d.m_firstSpanWhichCanStartDeltaMergePos )
+                    {
+                        d.m_firstSpanWhichCanStartDeltaMergePos      = getCurrentDocumentPosition();
+                        d.m_firstSpanWhichCanStartDeltaMergeRevision = last->getId();
+                    }
+                    else
+                    {
+                        if( last->getId() < d.m_firstSpanWhichCanStartDeltaMergeRevision )
+                        {
+                            d.m_firstSpanWhichCanStartDeltaMergePos      = getCurrentDocumentPosition();
+                            d.m_firstSpanWhichCanStartDeltaMergeRevision = last->getId();
+                        }
+                    }
+                }
+
+                UT_DEBUGMSG(("ODe_CTPara_Listener::openSpan(3) isdel:%d last->id:%d cpos:%d dmpos:%d\n",
+                             (last->getType() == PP_REVISION_DELETION),
+                             last->getId(),
+                             getCurrentDocumentPosition(),
+                             d.m_firstSpanWhichCanStartDeltaMergePos
+                                ));
+                    
+            }
+        }
     }
     
     

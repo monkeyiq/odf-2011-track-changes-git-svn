@@ -45,6 +45,7 @@ ODe_ChangeTrackingParagraph_Data::updatePara( const PP_RevisionAttr* ra )
     UT_uint32 iMinId = 0;
 	if( const PP_Revision * r = ra->getRevisionWithId( 1, iMinId ) )
     {
+        UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::updatePara() this:%p\n", (void*)this ));
         UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::updatePara() have rev...a:%s\n", r->getAttrsString() ));
         UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::updatePara() have rev...p:%s\n", r->getPropsString() ));
 
@@ -171,67 +172,61 @@ ODe_ChangeTrackingParagraph_Data::update( const PP_RevisionAttr* ra, PT_DocPosit
         m_firstSpanRevision     = m_lastSpanRevision;
         m_firstSpanRevisionType = m_lastSpanRevisionType;
     }
+
+    // moved to super.
+    // if( last )
+    // {
+    //     if( last->getType() == PP_REVISION_DELETION )
+    //     {
+    //         if( !m_firstSpanAPForDeltaMerge )
+    //         {
+    //             m_firstSpanAPForDeltaMerge = last;
+    //             m_firstSpanAPForDeltaMergeRevision = last->getId();
+    //         }
+    //         else
+    //         {
+    //             if( last->getId() < m_firstSpanAPForDeltaMergeRevision )
+    //             {
+    //                 m_firstSpanAPForDeltaMerge = last;
+    //                 m_firstSpanAPForDeltaMergeRevision = last->getId();
+    //             }
+    //         }
+    //     }
+    //     else
+    //     {
+    //         m_firstSpanAPForDeltaMerge = 0;
+    //         m_firstSpanAPForDeltaMergeRevision = 0;
+    //     }
+        
+    // }
     
 }
 
 bool
 ODe_ChangeTrackingParagraph_Data::isParagraphStartDeleted()
 {
-    UT_DEBUGMSG(("isParagraphStartDeleted: id:%s maxR:%d maxDelR:%d minDelR:%d all-spans-same-rev:%d\n",
-                 m_splitID.c_str(),
-                 m_maxRevision,
-                 m_maxDeletedRevision, m_minDeletedRevision,
-                 m_allSpansAreSameVersion ));
+    // UT_DEBUGMSG(("isParagraphStartDeleted: id:%s maxR:%d maxDelR:%d minDelR:%d all-spans-same-rev:%d\n",
+    //              m_splitID.c_str(), m_maxRevision,
+    //              m_maxDeletedRevision, m_minDeletedRevision, m_allSpansAreSameVersion ));
+    // UT_DEBUGMSG(("isParagraphStartDeleted maxpr:%d maxpdr:%d\n",
+    //              m_maxParaRevision, m_maxParaDeletedRevision ));
+    // UT_DEBUGMSG(("isParagraphStartDeleted() fsrt:%d fsrev:%d maxpdr:%d\n",
+    //              m_firstSpanRevisionType, m_firstSpanRevision, m_maxParaDeletedRevision ));
 
-    UT_DEBUGMSG(("isParagraphStartDeleted maxpr:%d maxpdr:%d\n",
-                 m_maxParaRevision,
-                 m_maxParaDeletedRevision ));
+    // UT_DEBUGMSG(("isParagraphStartDeleted() m_paraStartDeletedRevision:%d\n", m_paraStartDeletedRevision ));
+    // UT_DEBUGMSG(("isParagraphStartDeleted() m_paraEndDeletedRevision  :%d\n", m_paraEndDeletedRevision ));
 
-    UT_DEBUGMSG(("isParagraphStartDeleted() fsrt:%d fsrev:%d maxpdr:%d\n",
-                 m_firstSpanRevisionType,
-                 m_firstSpanRevision,
-                 m_maxParaDeletedRevision ));
-
-    UT_DEBUGMSG(("isParagraphStartDeleted() m_paraStartDeletedRevision:%d\n", m_paraStartDeletedRevision ));
-    UT_DEBUGMSG(("isParagraphStartDeleted() m_paraEndDeletedRevision:%d\n", m_paraEndDeletedRevision ));
     return m_paraStartDeletedRevision > 0;
-    
-    
-    // bool ret = false;
-
-    // if( m_firstSpanRevisionType == PP_REVISION_DELETION )
-    // {
-    //     if( m_firstSpanRevision == m_maxParaDeletedRevision )
-    //     {
-    //         UT_DEBUGMSG(("isParagraphStartDeleted yes case 1\n" ));
-    //         ret = true;
-    //     }
-    // }
-    
-    // if( m_maxParaDeletedRevision )
-    // {
-    //     if( m_minDeletedRevision < m_maxParaDeletedRevision )
-    //     {
-    //         UT_DEBUGMSG(("isParagraphStartDeleted yes case 2\n" ));
-    //         ret = true;
-    //     }
-    // }
-    // return ret;
 }
 
 bool
 ODe_ChangeTrackingParagraph_Data::isParagraphEndDeleted()
 {
-    UT_DEBUGMSG(("isParagraphStartDeleted() m_paraStartDeletedRevision:%d\n", m_paraStartDeletedRevision ));
-    UT_DEBUGMSG(("isParagraphStartDeleted() m_paraEndDeletedRevision:%d\n", m_paraEndDeletedRevision ));
-    return m_paraEndDeletedRevision > 0;
+    // UT_DEBUGMSG(("isParagraphStartDeleted() this:%p\n", (void*)this ));
+    // UT_DEBUGMSG(("isParagraphStartDeleted() m_paraStartDeletedRevision:%d\n", m_paraStartDeletedRevision ));
+    // UT_DEBUGMSG(("isParagraphStartDeleted() m_paraEndDeletedRevision  :%d\n", m_paraEndDeletedRevision ));
 
-    // if( m_lastSpanRevisionType == PP_REVISION_DELETION )
-    // {
-    //     return true;
-    // }
-    
-    // return false;
+    return m_paraEndDeletedRevision > 0;
 }
 
 
@@ -239,26 +234,40 @@ ODe_ChangeTrackingParagraph_Data::isParagraphEndDeleted()
 bool
 ODe_ChangeTrackingParagraph_Data::isParagraphDeleted()
 {
-    UT_DEBUGMSG(("isParagraphDeleted: m_del:%d m_maxRevision:%d m_maxDeletedRevision:%d all-spans-same-rev:%d\n",
-                 m_paraDeletedRevision, m_maxRevision, m_maxDeletedRevision, m_allSpansAreSameVersion ));
+//    UT_DEBUGMSG(("isParagraphDeleted: m_del:%d m_maxRevision:%d m_maxDeletedRevision:%d all-spans-same-rev:%d\n",
+//                 m_paraDeletedRevision, m_maxRevision, m_maxDeletedRevision, m_allSpansAreSameVersion ));
 
     return m_paraDeletedRevision ||
         (isParagraphStartDeleted() && isParagraphEndDeleted());
-    
-    
-    // // table cells might have <c></c> elements with no revision numbers in them
-    // if( m_maxParaDeletedRevision > 0 )
-    // {
-    //     if( m_allSpansAreSameVersion && !m_maxRevision )
-    //     {
-    //         return true;
-    //     }
-    // }
-
-    // return m_maxRevision
-    //     && m_maxRevision == m_maxDeletedRevision
-    //     && m_allSpansAreSameVersion;
 }
+
+UT_uint32
+ODe_ChangeTrackingParagraph_Data::getParagraphDeletedVersion()
+{
+    if( m_paraDeletedRevision )
+        return m_paraDeletedRevision;
+    
+    if( isParagraphStartDeleted() && isParagraphEndDeleted() )
+    {
+        return std::max( getParagraphStartDeletedVersion(),
+                         getParagraphEndDeletedVersion() );
+    }
+    
+    return 0;
+}
+
+UT_uint32
+ODe_ChangeTrackingParagraph_Data::getParagraphStartDeletedVersion()
+{
+    return m_paraStartDeletedRevision;
+}
+
+UT_uint32
+ODe_ChangeTrackingParagraph_Data::getParagraphEndDeletedVersion()
+{
+    return m_paraEndDeletedRevision;
+}
+
 
 UT_uint32
 ODe_ChangeTrackingParagraph_Data::getVersionWhichRemovesParagraph()
@@ -283,3 +292,10 @@ ODe_ChangeTrackingParagraph_Data::getVersionWhichIntroducesParagraph()
         return 0;
     return m_minRevision;
 }
+
+PT_DocPosition
+ODe_ChangeTrackingParagraph_Data::getFirstSpanWhichCanStartDeltaMergePos() const
+{
+    return m_firstSpanWhichCanStartDeltaMergePos;
+}
+

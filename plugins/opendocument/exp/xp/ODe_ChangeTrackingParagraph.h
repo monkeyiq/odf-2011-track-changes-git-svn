@@ -80,8 +80,22 @@ class ODe_ChangeTrackingParagraph_Data
     UT_uint32 m_paraDeletedRevision;      //< Paragraphs ABIATTR_PARA_DELETED_REVISION
     UT_uint32 m_paraEndDeletedRevision;   //< Paragraphs ABIATTR_PARA_END_DELETED_REVISION
     UT_uint32 m_paraStartDeletedRevision; //< Paragraphs ABIATTR_PARA_START_DELETED_REVISION
+
+    /*
+     * This is the offset of the first span which can be included in a
+     * delta:merge. Consider a paragraph with spans and versions as
+     * below:
+     *
+     * (1)foo (-2) bar (1) middle (-2) end In this case the
+     *
+     * "bar" span is a false start, we can only start the delta:merge
+     * at the "end" span. As it is not certain that the end span is
+     * the single last span, this is a cache of the doc position when a
+     * delta:merge could start.
+     */
+    PT_DocPosition m_firstSpanWhichCanStartDeltaMergePos;
+    UT_uint32      m_firstSpanWhichCanStartDeltaMergeRevision;
     
-        
     std::string m_splitID;
     ODe_ChangeTrackingParagraph_Data()
         : m_lastSpanVersion(-1)
@@ -98,6 +112,8 @@ class ODe_ChangeTrackingParagraph_Data
         , m_paraDeletedRevision( 0 )
         , m_paraEndDeletedRevision( 0 )
         , m_paraStartDeletedRevision( 0 )
+        , m_firstSpanWhichCanStartDeltaMergePos( 0 )
+        , m_firstSpanWhichCanStartDeltaMergeRevision( 0 )
     {
     }
     void update( const PP_RevisionAttr* ra, PT_DocPosition pos );
@@ -105,6 +121,9 @@ class ODe_ChangeTrackingParagraph_Data
     bool isParagraphDeleted();
     bool isParagraphStartDeleted();
     bool isParagraphEndDeleted();
+    UT_uint32 getParagraphDeletedVersion();
+    UT_uint32 getParagraphStartDeletedVersion();
+    UT_uint32 getParagraphEndDeletedVersion();
     UT_uint32 getVersionWhichRemovesParagraph();
     UT_uint32 getVersionWhichIntroducesParagraph();
     void setSplitID( const std::string& s ) 
@@ -116,7 +135,8 @@ class ODe_ChangeTrackingParagraph_Data
         return m_splitID;
     }
     
-        
+
+    PT_DocPosition getFirstSpanWhichCanStartDeltaMergePos() const;
 };
 
  /**

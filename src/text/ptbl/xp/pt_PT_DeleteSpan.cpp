@@ -168,7 +168,7 @@ bool pt_PieceTable::dumpDoc(
 
 
 /**
- * Given a pointer to the start of a block, find the last pft_text
+ * Given a pointer to the start of a block, find the last PFT_Text
  * contained in that block or null.
  *
  */

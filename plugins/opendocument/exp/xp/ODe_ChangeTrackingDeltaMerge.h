@@ -72,11 +72,13 @@ class ODe_ChangeTrackingDeltaMerge
     ODe_AuxiliaryData& m_rAuxiliaryData;
     state_t   m_state;
     UT_uint32 m_revision;
+    std::string m_additionalTrailingContent;
     
   ODe_ChangeTrackingDeltaMerge( ODe_AuxiliaryData& aux, UT_uint32 r )
       : m_rAuxiliaryData( aux )
         , m_state( DM_NONE )
         , m_revision( r )
+        , m_additionalTrailingContent("")
     {
     }
     
@@ -113,6 +115,11 @@ class ODe_ChangeTrackingDeltaMerge
      * Close the delta:merge XML element
      */
     void close();
+
+    /**
+     * Sometimes you want something to wrap the detla:merge when it closes
+     */
+    void setAdditionalTrailingContent( const std::string& s );
 };
 
 #endif

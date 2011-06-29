@@ -1045,8 +1045,10 @@ void PP_RevisionAttr::mergeAttr( UT_uint32 iId, PP_RevisionType t,
 /**
  * Do not replace the attribute/value if it exists in the given revision already.
  */
-void PP_RevisionAttr::mergeAttrIfNotAlreadyThere( UT_uint32 iId, PP_RevisionType t,
-                                                  const gchar* pzName, const gchar* pzValue )
+void PP_RevisionAttr::mergeAttrIfNotAlreadyThere( UT_uint32 iId,
+                                                  PP_RevisionType t,
+                                                  const gchar* pzName,
+                                                  const gchar* pzValue )
 {
 	for(UT_sint32 i = 0; i < m_vRev.getItemCount(); i++)
 	{
@@ -1549,3 +1551,27 @@ const char* UT_getAttribute( const PP_AttrProp* pAP, const char* name, const cha
     }
     return pValue;
 }
+
+const PP_Revision *
+PP_RevisionAttr::getLowestDeletionRevision() const
+{
+    if( !getRevisionsCount() )
+        return 0;
+
+    UT_uint32 rmax = getRevisionsCount();
+    const PP_Revision* last  = getNthRevision( rmax-1 );
+    if( last->getType() != PP_REVISION_DELETION )
+        return 0;
+    
+    for( long idx = rmax - 1; idx >= 0; --idx )
+    {
+        const PP_Revision* p = getNthRevision( idx );
+        if( p->getType() != PP_REVISION_DELETION )
+        {
+            return last;
+        }
+        last = p;
+    }
+    return 0;
+}
+

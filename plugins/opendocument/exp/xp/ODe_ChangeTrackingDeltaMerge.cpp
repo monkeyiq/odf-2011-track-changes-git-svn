@@ -103,6 +103,12 @@ void
 ODe_ChangeTrackingDeltaMerge::close()
 {
     setState( DM_END );
-    m_ss << "</delta:merge>";
+    m_ss << "</delta:merge>" << m_additionalTrailingContent;
+}
+
+void
+ODe_ChangeTrackingDeltaMerge::setAdditionalTrailingContent( const std::string& s )
+{
+    m_additionalTrailingContent = s;
 }
 
