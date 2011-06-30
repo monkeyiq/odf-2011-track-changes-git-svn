@@ -4572,8 +4572,8 @@ void FV_View::cmdCopy(bool bToClipboard)
 		{
 			const char * pszValue = 0;
 //			PTStruxType type = m_pDoc->getStruxType( sfh );
-			rc = m_pDoc->getAttributeFromSDH( sdh, true, 0,
-											  "baz", &pszValue );
+			bool rc = m_pDoc->getAttributeFromSDH( sdh, true, 0,
+												   "baz", &pszValue );
 			UT_DEBUGMSG(("fv_View::cmdCopy:2 pos:%d epos:%d rc:%d\n", pos, dr.m_pos2, rc));
 			if( rc )
 			{

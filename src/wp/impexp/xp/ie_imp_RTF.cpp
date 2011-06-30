@@ -2779,14 +2779,6 @@ bool IE_Imp_RTF::HandleParKeyword()
 		attrs[attrsIdx++] = rev.c_str();
 		props = NULL;
 	}
- 	// if( !m_ctMoveID.empty() )
-	// {
-	// 	UT_DEBUGMSG(("HandleParKeyword() move-id %s\n", m_ctMoveID.c_str() ));
-	// 	attrs[attrsIdx++] = "delta:move-idref";
-	// 	attrs[attrsIdx++] = m_ctMoveID.c_str();
-	// }
-	
-	
 
 	if((props && *props) || attrs[0])
 	{

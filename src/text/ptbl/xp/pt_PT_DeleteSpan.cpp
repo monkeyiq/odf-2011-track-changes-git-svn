@@ -213,29 +213,36 @@ static pf_Frag_Text* findLastTextFragOfBlock( pf_Frag_Strux* pfblock )
  */
 pf_Frag_Strux* pt_PieceTable::inSameBlock( PT_DocPosition startpos, PT_DocPosition endpos )
 {    
-    pf_Frag *startFrag;
-    PT_BlockOffset os;
     pf_Frag_Strux* ret = 0;
-    
-    if(!getFragFromPosition( startpos, &startFrag, &os ))
-    {
-        UT_DEBUGMSG(("ODTCT: inSameBlock() can not get start, startpos:%d endpos:%d\n", startpos, endpos ));
-        return ret;
-    }
-
-    pf_Frag_Strux *startBlock, *endBlock;
-    if( pf_Frag_Strux* pfs = tryDownCastStrux( startFrag, PTX_Block ))
-    {
-        startBlock = pfs;
-    }
-    else if(!_getStruxOfTypeFromPosition( startpos, PTX_Block, &startBlock ))
-    {
-        return ret;
-    }
+    pf_Frag_Strux* startBlock = _getBlockFromPosition( startpos );
+    pf_Frag_Strux* endBlock   = 0;
     if(!_getStruxOfTypeFromPosition( endpos, PTX_Block, &endBlock ))
     {
         return ret;
     }
+
+    // pf_Frag *startFrag;
+    // PT_BlockOffset os;
+    
+    // if(!getFragFromPosition( startpos, &startFrag, &os ))
+    // {
+    //     UT_DEBUGMSG(("ODTCT: inSameBlock() can not get start, startpos:%d endpos:%d\n", startpos, endpos ));
+    //     return ret;
+    // }
+
+    // pf_Frag_Strux *startBlock, *endBlock;
+    // if( pf_Frag_Strux* pfs = tryDownCastStrux( startFrag, PTX_Block ))
+    // {
+    //     startBlock = pfs;
+    // }
+    // else if(!_getStruxOfTypeFromPosition( startpos, PTX_Block, &startBlock ))
+    // {
+    //     return ret;
+    // }
+    // if(!_getStruxOfTypeFromPosition( endpos, PTX_Block, &endBlock ))
+    // {
+    //     return ret;
+    // }
 
     if( startBlock == endBlock )
         ret = startBlock;
@@ -411,7 +418,7 @@ bool pt_PieceTable::deleteSpanChangeTrackingAreWeMarkingDeltaMerge( PT_DocPositi
     
     pf_Frag *startFrag, *endFrag;
     PT_BlockOffset os,oe;
-
+    
     if(!getFragFromPosition( startpos, &startFrag, &os ))
     {
         UT_DEBUGMSG(("ODTCT: areWeMarkingDM() can not get start, startpos:%d endpos:%d\n", startpos, endpos ));
@@ -423,7 +430,6 @@ bool pt_PieceTable::deleteSpanChangeTrackingAreWeMarkingDeltaMerge( PT_DocPositi
         UT_DEBUGMSG(("ODTCT: areWeMarkingDM() can not get end, startpos:%d endpos:%d\n", startpos, endpos ));
         return ret;
     }
-
     pf_Frag_Strux *startBlock, *endBlock;
     if( pf_Frag_Strux* pfs = tryDownCastStrux( startFrag, PTX_Block ))
     {
@@ -435,6 +441,8 @@ bool pt_PieceTable::deleteSpanChangeTrackingAreWeMarkingDeltaMerge( PT_DocPositi
         UT_DEBUGMSG(("ODTCT: areWeMarkingDM() can not get start block, startpos:%d endpos:%d\n", startpos, endpos ));
         return ret;
     }
+
+    
     if(!_getStruxOfTypeFromPosition( endpos, PTX_Block, &endBlock ))
     {
         UT_DEBUGMSG(("ODTCT: areWeMarkingDM() can not get end block, startpos:%d endpos:%d\n", startpos, endpos ));
