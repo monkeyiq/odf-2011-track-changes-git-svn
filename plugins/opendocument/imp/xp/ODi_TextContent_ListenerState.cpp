@@ -498,6 +498,7 @@ ODi_TextContent_ListenerState::ctSimplifyFromTwoAdjacentStyles( const PP_Revisio
 
 
 
+
 /**
  * Called when the XML parser finds a start element tag.
  * 
@@ -588,13 +589,37 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
     }
     else if (!strcmp(pName, "delta:leading-partial-content" ))
     {
-        UT_DEBUGMSG(("delta:leading-partial-content (start)\n" ));
+        UT_DEBUGMSG(("delta:leading-partial-content (start) mergeIDRef:%s\n", m_mergeIDRef.c_str() ));
 
         _flush ();
         _popInlineFmt();
         m_pAbiDocument->appendFmt(&m_vecInlineFmt);
 
         PP_RevisionAttr ctRevision;
+
+        UT_DEBUGMSG(("delta:leading-partial-content gettting ADD version. stack.sz:%d\n",
+                     m_ctAddRemoveStack.size() ));
+        ctAddRemoveStackSetup( ctRevision, m_ctAddRemoveStack );
+        // for( m_ctAddRemoveStack_t::iterator si = m_ctAddRemoveStack.begin();
+        //      si != m_ctAddRemoveStack.end(); ++si )
+        // {
+        //     PP_RevisionType rt = si->first;
+        //     std::string     id = si->second;
+
+        //     if( rt == PP_REVISION_ADDITION )
+        //     {
+        //         ctRevision.addRevision( fromChangeID(id), PP_REVISION_ADDITION );
+        //         break;
+        //     }
+        // }
+        
+//        ctRevision.addRevision( fromChangeID("1"), PP_REVISION_ADDITION );
+    //     {
+    //         pf_Frag* pf = getFragFromPosition(PT_DocPosition docPos) const;
+    // else if(!_getStruxOfTypeFromPosition( startpos, PTX_Block, &startBlock ))
+            
+    //     }
+        
         ctRevision.addRevision( fromChangeID(m_mergeIDRef), PP_REVISION_DELETION );
 
         if( strlen(ctRevision.getXMLstring()) )

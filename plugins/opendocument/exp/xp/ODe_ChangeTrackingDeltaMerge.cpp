@@ -23,6 +23,10 @@
 #include "ODe_AuxiliaryData.h"
 #include "pp_Revision.h"
 
+// This makes round trips not 100% in some cases but produces easier
+// to read odt/content.xml files
+//#define DEBUGGING_ADD_NEWLINES 0
+
 bool
 ODe_ChangeTrackingDeltaMerge::isDifferentRevision( const PP_RevisionAttr& ra )
 {
@@ -63,11 +67,17 @@ ODe_ChangeTrackingDeltaMerge::setState( state_t s )
     
     if( s >= DM_LEADING && old < DM_LEADING )
     {
-        m_ss << "<delta:leading-partial-content>"; // << std::endl;
+        m_ss << "<delta:leading-partial-content>";
+#ifdef DEBUGGING_ADD_NEWLINES
+        m_ss << std::endl;
+#endif
     }
     if( s >= DM_INTER && old < DM_INTER )
     {
-        m_ss << "</delta:leading-partial-content>"; // << std::endl;
+        m_ss << "</delta:leading-partial-content>";
+#ifdef DEBUGGING_ADD_NEWLINES
+        m_ss << std::endl;
+#endif
         m_ss << "<delta:intermediate-content>" << std::endl;
     }
     if( s >= DM_TRAILING && old < DM_TRAILING )
@@ -95,7 +105,10 @@ void
 ODe_ChangeTrackingDeltaMerge::open()
 {
     std::string idref = m_rAuxiliaryData.toChangeID( m_revision );
-    m_ss << "<delta:merge delta:removal-change-idref=\"" << idref << "\">" << std::endl;
+    m_ss << "<delta:merge delta:removal-change-idref=\"" << idref << "\">";
+#ifdef DEBUGGING_ADD_NEWLINES
+    m_ss << std::endl;
+#endif
     m_state = DM_OPENED;
 }
 

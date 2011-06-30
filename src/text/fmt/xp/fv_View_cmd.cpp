@@ -4556,18 +4556,19 @@ void FV_View::cmdCopy(bool bToClipboard)
 	getDocumentRangeOfCurrentSelection(&dr);
 
 	// For ODT Change Tracking we need to record a paragraph "move" source. 
-	bool revisionTracking = true;
-	if( revisionTracking )
+	if( m_pDoc->usingChangeTracking() )
 	{
 		PT_DocPosition pos = dr.m_pos1;
-		PL_StruxFmtHandle sfh;
-		PL_StruxDocHandle sdh;
 		PL_ListenerId listenerId = 0;
+
+		PL_StruxDocHandle sdh = m_pDoc->getBlockFromPosition( pos );
 		
+		// PL_StruxFmtHandle sfh;
+		// PL_StruxDocHandle sdh;
 //		bool rc = m_pDoc->getStruxFromPosition( listenerId, pos, &sfh);
-		bool rc = m_pDoc->getStruxOfTypeFromPosition( pos, PTX_Block, &sdh);
-		UT_DEBUGMSG(("fv_View::cmdCopy: pos:%d rc:%d\n", pos, rc));
-		if( rc )
+//		bool rc = m_pDoc->getStruxOfTypeFromPosition( pos, PTX_Block, &sdh);
+		UT_DEBUGMSG(("fv_View::cmdCopy: pos:%d rc:%p\n", pos, sdh));
+		if( sdh )
 		{
 			const char * pszValue = 0;
 //			PTStruxType type = m_pDoc->getStruxType( sfh );

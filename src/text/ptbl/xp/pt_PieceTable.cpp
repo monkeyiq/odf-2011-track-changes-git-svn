@@ -1035,6 +1035,45 @@ bool pt_PieceTable::_getStruxFromPosition(PT_DocPosition docPos,
 	return pfs != NULL;
 }
 
+PL_StruxDocHandle pt_PieceTable::getBlockFromPosition(PT_DocPosition pos) const
+{
+	pf_Frag_Strux* pfs = _getBlockFromPosition(pos);
+	PL_StruxDocHandle ret = static_cast<PL_StruxDocHandle>(pfs);
+    return ret;
+}
+
+
+/**
+ * Get the PTX_Block that contains the given document position. Note that
+ * pos might itself point right at a PTX_Block in which case that is the block
+ * that is returned. This might return null if there is no containing block
+ */
+pf_Frag_Strux* pt_PieceTable::_getBlockFromPosition(PT_DocPosition pos) const
+{
+    pf_Frag* pf;
+    PT_BlockOffset offset;
+    pf_Frag_Strux* ret = 0;
+    
+    if(!getFragFromPosition( pos, &pf, &offset ))
+    {
+        return ret;
+    }
+
+    // if the fragment right at pos is a block, return it.
+    if( pf_Frag_Strux* pfs = tryDownCastStrux( pf, PTX_Block ))
+    {
+        return pfs;
+    }
+    // otherwise search backwards for the block.
+    if(!_getStruxOfTypeFromPosition( pos, PTX_Block, &ret ))
+    {
+        return 0;
+    }
+    return ret;
+    
+}
+
+
 bool pt_PieceTable::_getStruxOfTypeFromPosition(PT_DocPosition dpos,
 												   PTStruxType pts,
 												   pf_Frag_Strux ** ppfs) const

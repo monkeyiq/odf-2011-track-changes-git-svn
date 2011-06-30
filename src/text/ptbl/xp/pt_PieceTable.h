@@ -337,6 +337,7 @@ public:
 	bool					getStruxOfTypeFromPosition(PT_DocPosition docPos,
 													   PTStruxType pts,
 													   PL_StruxDocHandle * sdh) const;
+    PL_StruxDocHandle       getBlockFromPosition(PT_DocPosition pos) const;
 
 	bool					getStruxFromPosition(PL_ListenerId listenerId,
 												 PT_DocPosition docPos,
@@ -434,6 +435,7 @@ protected:
 	bool					_getStruxOfTypeFromPosition(PT_DocPosition dpos,
 														PTStruxType pts,
 														pf_Frag_Strux ** ppfs) const;
+    pf_Frag_Strux*          _getBlockFromPosition(PT_DocPosition pos) const;
 	bool					_doTheDo(const PX_ChangeRecord * pcr, bool bUndo);
 	bool					_struxHasContent(pf_Frag_Strux * pfs) const;
 	bool					_struxIsEmpty(pf_Frag_Strux * pfs) const;

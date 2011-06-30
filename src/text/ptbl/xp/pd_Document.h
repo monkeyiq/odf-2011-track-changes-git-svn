@@ -430,6 +430,7 @@ PT_AttrPropIndex            getAPIFromSOH(PL_ObjectHandle odh);
 													   PTStruxType pts,
 													   PL_StruxFmtHandle * psfh) const;
 	bool					getStruxOfTypeFromPosition(PT_DocPosition, PTStruxType pts, PL_StruxDocHandle * sdh) const;
+    PL_StruxDocHandle       getBlockFromPosition( PT_DocPosition pos ) const;
 
 	pf_Frag *				getFragFromPosition(PT_DocPosition docPos) const;
 

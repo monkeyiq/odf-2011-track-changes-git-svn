@@ -71,13 +71,13 @@ IE_Exp_OpenDocument::IE_Exp_OpenDocument (PD_Document * pDoc)
 {
     if( pDoc )
     {
-        UT_DEBUGMSG(("IE_Exp_OpenDocument() pDoc:%p mark:%d show:%d hrev:%d\n",
+        UT_DEBUGMSG(("IE_Exp_OpenDocument() pDoc:%p mark:%d show:%d hrev:%d use:%d\n",
                      pDoc,
                      pDoc->isMarkRevisions(),
                      pDoc->isShowRevisions(),
-                     pDoc->getHighestRevisionId() ));
-        m_useChangeTracking |= pDoc->isMarkRevisions();
-        m_useChangeTracking |= ( pDoc->getHighestRevisionId() > 1 );
+                     pDoc->getHighestRevisionId(),
+                     pDoc->usingChangeTracking() ));
+        m_useChangeTracking = pDoc->usingChangeTracking();
         
 //        m_useChangeTracking |= pDoc->isShowRevisions();
         UT_DEBUGMSG(("IE_Exp_OpenDocument() pDoc:%p m_useChangeTracking:%d\n",

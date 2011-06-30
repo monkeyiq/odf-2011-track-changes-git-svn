@@ -4725,6 +4725,13 @@ bool PD_Document::getStruxOfTypeFromPosition(PL_ListenerId listenerId,
 	return m_pPieceTable->getStruxOfTypeFromPosition(listenerId,docPos,pts,psfh);
 }
 
+PL_StruxDocHandle PD_Document::getBlockFromPosition( PT_DocPosition pos ) const
+{
+    return m_pPieceTable->getBlockFromPosition( pos );
+}
+
+
+
 
 ///
 ///  return the SDH of the last strux of the given type
