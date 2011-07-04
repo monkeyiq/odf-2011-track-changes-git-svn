@@ -82,6 +82,7 @@ IE_Exp_OpenDocument::IE_Exp_OpenDocument (PD_Document * pDoc)
 //        m_useChangeTracking |= pDoc->isShowRevisions();
         UT_DEBUGMSG(("IE_Exp_OpenDocument() pDoc:%p m_useChangeTracking:%d\n",
                      pDoc, m_useChangeTracking ));
+        pDoc->dumpDoc( "IE_Exp_OpenDocument()", 0, 0 );
     }
     
 }

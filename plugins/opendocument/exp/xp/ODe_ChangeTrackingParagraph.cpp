@@ -22,6 +22,8 @@
 #include "ODe_ChangeTrackingParagraph.h"
 #include "ut_conversion.h"
 
+using std::string;
+
 
 void
 ODe_ChangeTrackingParagraph_Data::updatePara( const PP_RevisionAttr* ra )
@@ -70,6 +72,82 @@ ODe_ChangeTrackingParagraph_Data::updatePara( const PP_RevisionAttr* ra )
     }
     
     UT_DEBUGMSG(("ODe_ChangeTrackingParagraph_Data::updatePara() DONE\n" ));
+}
+
+
+static std::string removeAllPropsStartingWith( const std::string& s, const std::string& old )
+{
+    string ret = s;
+    UT_DEBUGMSG(("removeAllPropsStartingWith() s:%s old:%s\n", s.c_str(), old.c_str() ));
+    while( true )
+    {
+        int startpos = ret.find( old );
+        if( startpos == string::npos )
+            break;
+        int endpos = ret.find( ";", startpos+1 );
+        if( endpos == string::npos )
+            endpos = ret.find( "}", startpos+1 );
+        if( endpos == string::npos )
+            break;
+
+        UT_DEBUGMSG(("removeAllPropsStartingWith() start:%d end:%d\n", startpos, endpos ));
+        
+        std::string z;
+        z += ret.substr( 0, startpos-1 );
+        z += ret.substr( endpos + 1 );
+        ret = z;
+    }
+    return ret;
+}
+
+static UT_uint32 getMinRevision( const PP_RevisionAttr* ra, UT_uint32 existingValue )
+{
+    UT_uint32 ret = existingValue;
+    UT_DEBUGMSG(("getMinRevision() top, given:%d revcount:%d\n", existingValue, ra->getRevisionsCount() ));
+
+    if( !ra->getRevisionsCount() )
+        return ret;
+    const PP_Revision* first = ra->getNthRevision(0);
+    const PP_Revision* last  = ra->getLastRevision();
+
+    UT_uint32 foundId = 0;
+    const PP_Revision* r = 0;
+    for( UT_uint32 raIdx = 0;
+         raIdx < ra->getRevisionsCount() && (r = ra->getNthRevision( raIdx ));
+         raIdx++ )
+    {
+        UT_uint32 id = r->getId();
+        UT_DEBUGMSG(("getMinRevision() raIdx:%d id:%d\n", raIdx, id ));
+        if( id == 1 )
+        {
+            std::string s = r->toString();
+            UT_DEBUGMSG(("getMinRevision() s:%s\n", s.c_str() ));
+            UT_DEBUGMSG(("getMinRevision() onlymarkup:%d\n", r->onlyContainsAbiwordChangeTrackingMarkup() ));
+
+            if( r->onlyContainsAbiwordChangeTrackingMarkup() )
+                continue;
+
+            foundId = id;
+            break;
+        }
+        else
+        {
+            foundId = id;
+            break;
+        }
+    }
+
+    UT_DEBUGMSG(("getMinRevision() found:%d\n", foundId ));
+    if( foundId )
+    {
+        if( existingValue == -1 )
+            ret = foundId;
+        else
+            ret = std::min( existingValue, foundId );
+    }
+    
+    UT_DEBUGMSG(("getMinRevision(ret) given:%d return:%d\n", existingValue, ret ));
+    return ret;
 }
 
 
@@ -132,10 +210,12 @@ ODe_ChangeTrackingParagraph_Data::update( const PP_RevisionAttr* ra, PT_DocPosit
     }
     
 
-    if( m_minRevision == -1 )
-        m_minRevision = first->getId();
-    else
-        m_minRevision = std::min( m_minRevision, (long)first->getId() );
+    // if( m_minRevision == -1 )
+    //     m_minRevision = first->getId();
+    // else
+    //     m_minRevision = std::min( m_minRevision, (long)first->getId() );
+    m_minRevision = getMinRevision( ra, m_minRevision );
+    
     
     m_maxRevision = std::max( m_maxRevision, last->getId() );
     if( last->getType() == PP_REVISION_DELETION )

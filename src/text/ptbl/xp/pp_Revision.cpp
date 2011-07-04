@@ -281,6 +281,39 @@ std::string PP_Revision::toString() const
     return ret.str();
 }
 
+bool PP_Revision::onlyContainsAbiwordChangeTrackingMarkup() const
+{
+    UT_DEBUGMSG(("onlyContainsAbiwordChangeTrackingMarkup(top) ac:%d pc:%d\n", getAttributeCount(), getPropertyCount() ));
+
+    if( !getAttributeCount() )
+        return false;
+    if( getPropertyCount() )
+        return false;
+    
+    bool ret = true;
+	UT_uint32 i;
+	UT_uint32 iCount = getAttributeCount();
+	const gchar * n, *v;
+
+	for(i = 0; i < iCount; i++)
+	{
+		if(!getNthAttribute(i,n,v))
+		{
+			// UT_ASSERT_HARMLESS( UT_SHOULD_NOT_HAPPEN );
+			continue;
+		}
+        UT_DEBUGMSG(("onlyContainsAbiwordChangeTrackingMarkup() n:%s\n", n ));
+        
+        if( n != strstr( n, "abi-para" ) )
+        {
+            return false;
+        }
+    }
+    
+    return ret;
+}
+
+
 
 bool PP_Revision::operator == (const PP_Revision &op2) const
 {

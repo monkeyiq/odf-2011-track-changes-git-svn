@@ -679,7 +679,7 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
                        << "\"" << itid << "\""
                        << " delta:insertion-change-idref="
                        << "\"" << idref << "\""
-                       << "/>"
+                       << " />"
                        << "";
                     ODe_writeUTF8String(m_pParagraphContent, ss.str().c_str());
             
@@ -2681,7 +2681,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
 
             paragraphIdRef = ctp->getData().getVersionWhichIntroducesParagraph();
             additionalElementAttributesStream << " delta:insertion-type=\"" << insType << "\" "
-                                              << " delta:insertion-change-idref=\""
+                                              << " foo=\"xxx\" delta:insertion-change-idref=\""
                                               << m_rAuxiliaryData.toChangeID( paragraphIdRef )
                                               << "\" ";
         }
@@ -2787,6 +2787,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
 
     
     UT_DEBUGMSG(("opening para closeElementWithSlashGreaterThan:%d\n", startOfParagraphWasDeleted ));
+    UT_DEBUGMSG(("opening para paragraphIdRef:%d\n", paragraphIdRef ));
 //    output += "<!--- -->";
     _openODParagraphToBuffer( pAP,
                               output,
@@ -2795,12 +2796,18 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
                               startOfParagraphWasDeleted,
                               std::list< const PP_Revision* >(),
                               ctHighestRemoveLeavingContentStartRevision );
-    
+
+    //
+    // FIXME: shouldn't we delay this for each span to handle itself?
+    //
     if( ctp &&
         ctp->getData().m_maxParaRevision > ctp->getData().getVersionWhichIntroducesParagraph() )
     {
         UT_uint32 idref = ctp->getData().m_maxParaRevision;
         UT_uint32 id = ctp->getData().getVersionWhichIntroducesParagraph();
+
+        
+        UT_DEBUGMSG(("opening para introid:%d maxpara:%d\n", id, idref ));
         
         UT_UTF8String output;
         _printSpacesOffset(output);
@@ -2816,7 +2823,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
         //                         << "\" >"
         //                         << endl;
         paragraphSplitPostamble << output.utf8_str()
-                                << "<delta:inserted-text-start  delta:inserted-text-id=\""
+                                << "<delta:inserted-text-start delta:inserted-text-id=\""
                                 << m_rAuxiliaryData.toChangeID( id )
                                 << "\" />";
         m_ctpTextPBeforeClosingElementStream << "<delta:inserted-text-end delta:inserted-text-idref=\""

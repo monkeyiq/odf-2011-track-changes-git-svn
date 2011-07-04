@@ -74,7 +74,8 @@ class ABI_EXPORT PP_Revision: public PP_AttrProp
 //    PP_Revision* clone() const;
 
     std::string toString() const;
-
+    bool onlyContainsAbiwordChangeTrackingMarkup() const;
+    
   private:
 	void             _refreshString() const;
 	bool             _handleNestedRevAttr();

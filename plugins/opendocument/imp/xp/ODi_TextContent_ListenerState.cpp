@@ -2613,6 +2613,46 @@ ODi_TextContent_ListenerState::getParagraphStyle( const gchar* pStyleName ) cons
 }
 
 
+static bool haveProp( const PP_AttrProp* pAP, const char* pName )
+{
+    const gchar* pValue;
+    bool ok;
+    ok = pAP->getProperty( pName, pValue );
+    return ok && pValue;
+}
+
+static bool hasTextStyleProps( const PP_AttrProp* pAP )
+{
+    return haveProp( pAP, "color" )
+        || haveProp( pAP, "bgcolor" )
+        || haveProp( pAP, "font-family" )
+        || haveProp( pAP, "font-size" )
+        || haveProp( pAP, "lang" )
+        || haveProp( pAP, "font-style" )
+        || haveProp( pAP, "font-weight" )
+        || haveProp( pAP, "display" )
+        || haveProp( pAP, "display" )
+        || haveProp( pAP, "text-transform" )
+        ;
+}
+
+static bool hasTextStyleProps( const PP_RevisionAttr& ra )
+{
+    bool ret = false;
+
+    if( !ra.getRevisionsCount() )
+        return ret;
+
+    for(UT_uint32 i = 0; i < ra.getRevisionsCount() && !ret; ++i)
+    {
+        const PP_Revision* r = ra.getNthRevision(i);
+        ret |= hasTextStyleProps(r);
+    }
+    
+    return ret;
+}
+
+
 /**
  * Process <text:p> and <text:h> startElement calls
  */
@@ -2662,8 +2702,7 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         }
 
         //
-        // FIXME:
-        // handle the ac:changeXXX attribute which stores
+        // Handle the ac:changeXXX attribute which stores
         // revision,actype,attr,oldValue
         // and convert that to the needed format for PP_Revision of
         // revision,eType,attr,newValue
@@ -2674,7 +2713,6 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             ra.setRevision( ctRevision.getXMLstring() );
 
 
-// FIXME:MIQ            
             ////
             // make sure not to map text:style-name into ra here
             // we handle text:style-name explicitly below, translating to abiword attributes
@@ -2692,29 +2730,12 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             // abiword will understand. 
             //
             ctAddACChangeODFTextStyle( ra, ppParagraphAtts, ODi_Office_Styles::StylePara );
-            // PP_RevisionAttr x;
-            // ODi_ChangeTrackingACChange ct( this );
-            // ct.ctAddACChange( x, ppParagraphAtts );
-            // const PP_Revision* r = 0;
-            // for( int raIdx = 0;
-            //      raIdx < x.getRevisionsCount() && (r = x.getNthRevision( raIdx ));
-            //      raIdx++ )
-            // {
-            //     const ODi_Style_Style* pStyle = getParagraphStyle( UT_getAttribute( r, "text:style-name", 0 ) );
-            //     UT_DEBUGMSG(("openpara(acchange r) rev:%d have-pStyle:%d style:%s\n", r->getId(), pStyle!=0, pStyleName ));
-            //     spanStyle z( pStyle, r->getId(), PP_REVISION_FMT_CHANGE );
-            //     z.addRevision( ra );
-            // }
-
             UT_DEBUGMSG(("openpara(acchange) m_ctLeadingElementChangedRevision:%s\n", m_ctLeadingElementChangedRevision.getXMLstring() ));
             UT_DEBUGMSG(("openpara(acchange) ra:%s\n", ra.getXMLstring() ));
 
             ctRevision.setRevision(ra.getXMLstring());
             
             
-//            PP_RevisionAttr ra = ctGetACChange( ppParagraphAtts );
-//            ctRevision.setRevision(ra.getXMLstring());
-
             UT_DEBUGMSG(("ac:changeXXX:%s\n", ra.getXMLstring() ));
         }
         
@@ -2770,8 +2791,11 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         if( m_ctParagraphDeletedRevision != -1 )
         {
             UT_DEBUGMSG(("ODTCT ctRevision.addRevision() del startpara1 rev:%d\n", m_ctParagraphDeletedRevision ));
-//            ctRevision.addRevision( m_ctParagraphDeletedRevision,
-//                                    PP_REVISION_DELETION );
+
+            //////////FIXME:  was failing delete-whole-table-with-leading-and-trailing.rnc
+            // this line was commented.
+            ctRevision.addRevision( m_ctParagraphDeletedRevision,
+                                    PP_REVISION_DELETION );
         }
         if( !m_mergeIDRef.empty() )
         {
@@ -2818,19 +2842,24 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             UT_DEBUGMSG(("leading style:%s\n", m_ctLeadingElementChangedRevision.getXMLstring() ));
 
             if( !strcmp( pStyle->getDisplayName().utf8_str(), "Normal" )
-                && !strlen(ctRevision.getXMLstring()) )
+                && !hasTextStyleProps(ctRevision) )
+//                && !strlen(ctRevision.getXMLstring()) )
             {
                 UT_DEBUGMSG(("para has normal style and there are no leading styles to negate.\n" ));
             }
             else
             {
+                UT_DEBUGMSG(("para has special style and there might be leading styles to negate.\n" ));
+                UT_DEBUGMSG(("style:%s\n", pStyle->getDisplayName().utf8_str() ));
+                UT_DEBUGMSG(("rev.xml:%s\n", ctRevision.getXMLstring() ));
+        
                 const gchar ** pProps = 0;
                 propertyArray<> ppAtts;
                 ppAtts.push_back( "style" );
                 ppAtts.push_back( pStyle->getDisplayName().utf8_str() );
-                ctRevision.addRevision( fromChangeID(id),
-                                        PP_REVISION_FMT_CHANGE,
-                                        ppAtts.data(), pProps );
+                // ctRevision.addRevision( fromChangeID(id),
+                //                         PP_REVISION_FMT_CHANGE,
+                //                         ppAtts.data(), pProps );
             }
             
             UT_DEBUGMSG(("ctRevision.getXMLstring(after):%s\n", ctRevision.getXMLstring() ));
