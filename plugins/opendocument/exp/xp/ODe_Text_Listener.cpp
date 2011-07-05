@@ -2681,7 +2681,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
 
             paragraphIdRef = ctp->getData().getVersionWhichIntroducesParagraph();
             additionalElementAttributesStream << " delta:insertion-type=\"" << insType << "\" "
-                                              << " foo=\"xxx\" delta:insertion-change-idref=\""
+                                              << " delta:insertion-change-idref=\""
                                               << m_rAuxiliaryData.toChangeID( paragraphIdRef )
                                               << "\" ";
         }

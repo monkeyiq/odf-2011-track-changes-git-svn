@@ -2621,9 +2621,18 @@ static bool haveProp( const PP_AttrProp* pAP, const char* pName )
     return ok && pValue;
 }
 
+static bool haveAttr( const PP_AttrProp* pAP, const char* pName )
+{
+    const gchar* pValue;
+    bool ok;
+    ok = pAP->getAttribute( pName, pValue );
+    return ok && pValue;
+}
+
 static bool hasTextStyleProps( const PP_AttrProp* pAP )
 {
-    return haveProp( pAP, "color" )
+    return haveAttr( pAP, "style" )
+        || haveProp( pAP, "color" )
         || haveProp( pAP, "bgcolor" )
         || haveProp( pAP, "font-family" )
         || haveProp( pAP, "font-size" )
@@ -2640,15 +2649,21 @@ static bool hasTextStyleProps( const PP_RevisionAttr& ra )
 {
     bool ret = false;
 
+    UT_DEBUGMSG(("hasTextStyleProps() ra:%s\n", ra.getXMLstring() ));
+    
     if( !ra.getRevisionsCount() )
         return ret;
 
     for(UT_uint32 i = 0; i < ra.getRevisionsCount() && !ret; ++i)
     {
         const PP_Revision* r = ra.getNthRevision(i);
+        UT_DEBUGMSG(("hasTextStyleProps() i:%d id:%d ret:%d\n", i, r->getId(), ret ));
+        UT_DEBUGMSG(("hasTextStyleProps() has-prop-style:%d\n", haveAttr( r, "style" ) ));
+
         ret |= hasTextStyleProps(r);
     }
-    
+
+    UT_DEBUGMSG(("hasTextStyleProps() end ret:%d\n", ret ));
     return ret;
 }
 
@@ -2837,6 +2852,7 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             std::string id = ctInsertionChangeIDRef;
 
             UT_DEBUGMSG(("ctRevision.getXMLstring(before):%s\n", ctRevision.getXMLstring() ));
+            UT_DEBUGMSG(("ctRevision.has-style-props:%d\n", hasTextStyleProps(ctRevision) ));
             UT_DEBUGMSG(("pStyle:%s\n", pStyle->getDisplayName().utf8_str() ));
             UT_DEBUGMSG(("id:%s\n", id.c_str() ));
             UT_DEBUGMSG(("leading style:%s\n", m_ctLeadingElementChangedRevision.getXMLstring() ));
@@ -2857,9 +2873,10 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
                 propertyArray<> ppAtts;
                 ppAtts.push_back( "style" );
                 ppAtts.push_back( pStyle->getDisplayName().utf8_str() );
-                // ctRevision.addRevision( fromChangeID(id),
-                //                         PP_REVISION_FMT_CHANGE,
-                //                         ppAtts.data(), pProps );
+
+                ctRevision.addRevision( fromChangeID(id),
+                                        PP_REVISION_FMT_CHANGE,
+                                        ppAtts.data(), pProps );
             }
             
             UT_DEBUGMSG(("ctRevision.getXMLstring(after):%s\n", ctRevision.getXMLstring() ));
