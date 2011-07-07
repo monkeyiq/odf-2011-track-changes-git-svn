@@ -2206,14 +2206,13 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
     if( const char* revisionString = UT_getAttribute( pAP, "revision", 0 ))
     {
         //
-        // FIXME: this layering should only be performed for text:p/text:h related changes.
+        // Note that this layering should only be performed for
+        // text:p/text:h related changes. A check is performed using
+        // headingStateChanges() below.
         //
-
-
-        // 
-        //
-        // The "ra" and defaultAttrs objects must remain valid for this block
-        // as they are used in the ralist colleciton
+        // The "ra" and defaultAttrs objects must remain valid for
+        // this whole code block as they are used in the ralist
+        // colleciton.
         //
         PP_RevisionAttr ra( revisionString );
         int i = 0;
@@ -2364,6 +2363,10 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
     }
 #endif    
 
+    //
+    // Now lets look at the revisions information which does NOT force
+    // a flip-flop between text:h and text:p XML elements.
+    //
     if( ctp )
     {
         ODe_ChangeTrackingParagraph_Data& d = ctp->getData();
@@ -2381,11 +2384,8 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
         UT_DEBUGMSG(("ODTCT wholeD:%d wholeLastD:%d\n",  wholeOfParagraphWasDeleted, wholeOfLastParaWasDeleted ));
         UT_DEBUGMSG(("ODTCT startD:%d intable:%ld\n", startOfParagraphWasDeleted, m_rAuxiliaryData.m_ChangeTrackingAreWeInsideTable ));
         UT_DEBUGMSG(("ODTCT endD:%d\n", endOfParagraphWasDeleted ));
-        UT_DEBUGMSG(("ODTCT wv:%d sv:%d ev:%d\n",
-                     d.getParagraphDeletedVersion(),
-                     d.getParagraphStartDeletedVersion(),
-                     d.getParagraphEndDeletedVersion()
-                        ));
+        UT_DEBUGMSG(("ODTCT wv:%d sv:%d ev:%d\n", d.getParagraphDeletedVersion(),
+                     d.getParagraphStartDeletedVersion(), d.getParagraphEndDeletedVersion() ));
         
         // FIXME: nested-dm code needs to go here.
         if( m_ctDeltaMerge &&
