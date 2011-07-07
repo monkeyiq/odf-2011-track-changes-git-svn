@@ -317,6 +317,18 @@ const gchar* UT_getAttribute(const gchar* name, const gchar** atts)
 }
 
 
+bool isTrue( const char* s )
+{
+    if( !s )
+        return false;
+    if( !strcmp(s,"0"))
+        return false;
+    if( !strcmp(s,"false"))
+        return false;
+    return true;
+}
+
+
 
 //////////////////////////////////////////////////////////////////
 

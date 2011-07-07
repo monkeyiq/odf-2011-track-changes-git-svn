@@ -90,6 +90,13 @@ ABI_EXPORT const gchar* UT_getAttribute( const gchar* name,
                                          const gchar** atts, const gchar* def );
 
 
+/**
+ * s is not null and is not a string that is "0" or false or something
+ * sane that indicates "false".
+ */
+ABI_EXPORT bool isTrue( const char* s );
+
+
     
 
 

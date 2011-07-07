@@ -170,31 +170,25 @@ private:
     UT_UTF8String& appendAttribute( UT_UTF8String& ret, const char* key, const char* value );
 
 
-    // For ODT Change Tracking
-    std::stringstream m_ctpTextPBeforeClosingElementStream;  //< output before </text:p> is written
-    std::stringstream m_ctpTextPEnclosingElementCloseStream; //< output after  </text:p> is written
-    bool useChangeTracking();                                //< delegates to ODe_AuxiliaryData.
-    int m_ctpParagraphAdditionalSpacesOffset;                //< adjust m_spacesOffset during close of text:p
-    std::list< std::string > m_ctpTextSpanEnclosingElementCloseStreamStack; //< output after </text:span> is written
-    int m_ctpSpanAdditionalSpacesOffset;                        //< adjust m_spacesOffset during close of text:span
-    ODe_ChangeTrackingDeltaMerge* m_ctDeltaMerge;               //< if != 0 then we are inside a delta:merge element
-    bool m_ctDeltaMergeJustStarted;                             //< if we start a DM then close XML element tags are ommitted.
-    void ctDeltaMerge_cleanup();
-
-    bool openSpanForRevisionToBuffer( const PP_Revision* pAP, std::stringstream& ss, std::stringstream& postss );
-
-    
     /**
-     * Gather all of the attrName attributes from the revisions of
-     * pAP. The attrDefault if non zero is assumed to be the "normal"
-     * state and is taken as the value of rev=START. The return value
-     * is in order from the start of document to the last revision.
-     * ie, last(return value) is the last change.
+     * For ODT Generic Change Tracking
      */
     typedef std::list< std::string > stringlist_t;
-    stringlist_t convertRevisionStringToAttributeStack( const PP_AttrProp* pAP,
-                                                        const char* attrName,
-                                                        const char* attrDefault );
+
+    stringlist_t      m_ctpTextSpanEnclosingElementCloseStreamStack; //< output after </text:span> is written
+    stringlist_t      m_genericBlockClosePostambleList;      //< Output in closeBlock() after the </text:p> like close.
+    std::stringstream m_ctpTextPBeforeClosingElementStream;  //< output before </text:p> is written
+    std::stringstream m_ctpTextPEnclosingElementCloseStream; //< output after  </text:p> is written
+    ODe_ChangeTrackingDeltaMerge* m_ctDeltaMerge;            //< if != 0 then we are inside a delta:merge element
+    int  m_ctpParagraphAdditionalSpacesOffset;               //< adjust m_spacesOffset during close of text:p
+    int  m_ctpSpanAdditionalSpacesOffset;                    //< adjust m_spacesOffset during close of text:span
+    bool m_ctDeltaMergeJustStarted;                          //< if we start a DM then close XML element tags are ommitted.
+
+    bool useChangeTracking();                  //< delegates to ODe_AuxiliaryData::useChangeTracking().
+    void ctDeltaMerge_cleanup();               //< handle deletion of m_ctDeltaMerge if required.
+
+    bool isHeading( const PP_AttrProp* pAP ) const; 
+    bool headingStateChanges( const PP_AttrProp* pAPa, const PP_AttrProp* pAPb ) const;
     void _openODParagraphToBuffer( const PP_AttrProp* pAP,
                                    UT_UTF8String& output,
                                    UT_uint32 paragraphIdRef,
@@ -202,11 +196,7 @@ private:
                                    bool closeElementWithSlashGreaterThan = false,
                                    std::list< const PP_Revision* > rl = std::list< const PP_Revision* >(),
                                    UT_uint32 ctHighestRemoveLeavingContentStartRevision = 0 );
-    stringlist_t m_genericBlockClosePostambleList;
 
-    // return true of the paragraph fpr pAP is a heading
-    bool isHeading( const PP_AttrProp* pAP ) const;
-    bool headingStateChanges( const PP_AttrProp* pAPa, const PP_AttrProp* pAPb ) const;
     
     
 };

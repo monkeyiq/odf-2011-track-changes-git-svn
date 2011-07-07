@@ -54,9 +54,6 @@
 #include <sstream>
 using std::endl;
 
-
-
-
 /**
  * Constructor
  * 
@@ -151,16 +148,21 @@ ODe_Text_Listener::~ODe_Text_Listener()
     UT_ASSERT_HARMLESS(m_currentListLevel == 0);
     UT_ASSERT_HARMLESS(m_pCurrentListStyle == NULL);
 
-    // If the last paragraph had its end deleted
-    // then a <delta:merge> would have been started
-    // and we must close that to make sure the XML is balanced
+    //
+    // MIQ11: Make sure that if a <delta:merge> happens to still be
+    // open that it is now closed. This shouldn't happen now because
+    // if a paragraph is deleted into and up to right at it's end then
+    // it is not treated as a delta:merge but as a removed-content
+    // instead. In the early days the last paragraph might have had
+    // it's end end deleted and a delta:merge left open at this time.
+    //
     if( m_ctDeltaMerge )
     {
         UT_DEBUGMSG(("ODe_Text_Listener::~ODe_Text_Listener() still have delta:merge...\n"));
         
         closeBlock();
         m_ctDeltaMerge->close();
-        ODe_writeUTF8String(m_pParagraphContent, m_ctDeltaMerge->flushBuffer().c_str() );
+        ODe_writeString(m_pParagraphContent, m_ctDeltaMerge->flushBuffer() );
     }
     ctDeltaMerge_cleanup();
 }
@@ -232,46 +234,40 @@ void ODe_Text_Listener::closeBlock()
         }
         else
         {
-            // ODTCT might want to not include the close tag for the XML element
-            // if two paragraphs have been merged. Normally isStartOfNextParagraphDeleted
-            // remains false and we include the close tag.
+            // MIQ11: The main reason that this whole block exists is
+            // to work out the value of outputCloseTag which
+            // determines if we should include the close tag </text:p>
+            // or not. In some cases, mostly relating to the
+            // delta:merge construct when two or more paragraphs are
+            // merged, we omit the closing tag for a paragraph.
+            // 
+            // Normally isStartOfNextParagraphDeleted remains false
+            // and we include the close tag.
+            //
             bool isStartOfNextParagraphDeleted = false;
             UT_uint32 pos = getCurrentDocumentPosition();
-
             if( pos > 0 )
                 --pos;
             
-//            const gchar* pValue;
-//            bool ok;
-            pChangeTrackingParagraphData_t ctp = m_rAuxiliaryData.getChangeTrackingParagraphData( pos );
-            // ok = pAP->getAttribute(PT_CHANGETRACKING_SPLIT_ID, pValue);
-            // if (ok) UT_DEBUGMSG(("ODTCT closeBlock() split-id-from-attr:%s\n", pValue ));
-            // else    UT_DEBUGMSG(("ODTCT closeBlock() NO SPLIT_ID FOUND\n" ));
-
-            if( ctp )
+            if( pChangeTrackingParagraphData_t ctp = m_rAuxiliaryData.getChangeTrackingParagraphData( pos ) )
             {
-                bool allDel   = ctp->getData().isParagraphDeleted();
-                bool startDel = ctp->getData().isParagraphStartDeleted();
+                ODe_ChangeTrackingParagraph_Data& d = ctp->getData();
+                bool allDel   = d.isParagraphDeleted();
+                bool startDel = d.isParagraphStartDeleted();
             
                 UT_DEBUGMSG(("ODTCT CB split:%s pos:%d min:%d max:%d vrem:%d vadd:%d mpr:%d allDel:%d start-del:%d lctype:%d\n",
-                             ctp->getData().getSplitID().c_str(),
-                             pos,
-                             ctp->getData().m_minRevision,
-                             ctp->getData().m_maxRevision,
-                             ctp->getData().getVersionWhichRemovesParagraph(),
-                             ctp->getData().getVersionWhichIntroducesParagraph(),
-                             ctp->getData().m_maxParaRevision,
-                             allDel,
-                             startDel,
-                             ctp->getData().m_lastSpanRevisionType ));
+                             d.getSplitID().c_str(), pos,
+                             d.m_minRevision, d.m_maxRevision,
+                             d.getVersionWhichRemovesParagraph(),
+                             d.getVersionWhichIntroducesParagraph(),
+                             d.m_maxParaRevision, allDel, startDel,
+                             d.m_lastSpanRevisionType ));
 
                 if( m_rAuxiliaryData.m_ChangeTrackingAreWeInsideTable )
                 {
                 }
                 else
                 {
-///////                    if( !allDel && ctp->getData().m_lastSpanRevisionType == PP_REVISION_DELETION )
-
                     if( !allDel )
                     {
                         if( pChangeTrackingParagraphData_t n = ctp->getNext() )
@@ -310,22 +306,33 @@ void ODe_Text_Listener::closeBlock()
             {
                 outputCloseTag = false;
             }
-                
             UT_DEBUGMSG(("ODTCT CB outputCloseTag:%d m_ctDeltaMergeJustStarted:%d\n",
                          outputCloseTag, m_ctDeltaMergeJustStarted ));
+
+            
             if( outputCloseTag )
             {
                 ODe_writeUTF8String(m_pParagraphContent, "</text:p>\n");
             }
+
         }
 
+        //
+        // ODTCT: Output any wrappers around this block.
+        //
         for( stringlist_t::iterator si = m_genericBlockClosePostambleList.begin();
              si != m_genericBlockClosePostambleList.end(); ++si )
         {
-            ODe_writeUTF8String(m_pParagraphContent, si->c_str() );
+            ODe_writeString(m_pParagraphContent, *si );
         }
         m_genericBlockClosePostambleList.clear();
 
+        
+        //
+        // ODTCT: We should now start processing the intermediate content.
+        // Record that state and output the XML at this location to
+        // make it so.
+        //
         if( m_ctDeltaMerge )
         {
             m_ctDeltaMerge->setState( ODe_ChangeTrackingDeltaMerge::DM_INTER );
@@ -341,9 +348,10 @@ class ODFChangeTrackerIdFactory
     UT_uint32   m_id;
     std::string m_prefix;
 public:
+    
     ODFChangeTrackerIdFactory( const char* prefix = "ctid-" ) : m_id(1) , m_prefix(prefix)
-    {
-    };
+    {};
+
     std::string createId()
     {
         std::string ret = m_prefix + tostr(m_id);
@@ -354,6 +362,8 @@ public:
 static ODFChangeTrackerIdFactory m_ctIdFactory;
 static ODFChangeTrackerIdFactory m_cteeIDFactory("ee");
 
+
+
 void
 ODe_Text_Listener::ctDeltaMerge_cleanup()
 {
@@ -362,7 +372,10 @@ ODe_Text_Listener::ctDeltaMerge_cleanup()
 }
 
 
-bool textChangedAfterRevision( PP_RevisionAttr& ra, UT_uint32 rev )
+/**
+ * Is the text content changed (add/delete) after 'rev' in the revision attribute.
+ */
+static bool textChangedAfterRevision( PP_RevisionAttr& ra, UT_uint32 rev )
 {
     const PP_Revision* r = 0;
     for( long raIdx = ra.getRevisionsCount()-1;
@@ -379,7 +392,10 @@ bool textChangedAfterRevision( PP_RevisionAttr& ra, UT_uint32 rev )
 }
 
 
-UT_uint32 getHighestRevisionNumberWithStyle( PP_RevisionAttr& ra )
+/**
+ * Get the last revision which has text style properties.
+ */
+static UT_uint32 getHighestRevisionNumberWithStyle( PP_RevisionAttr& ra )
 {
     const PP_Revision* r = 0;
 
@@ -394,46 +410,11 @@ UT_uint32 getHighestRevisionNumberWithStyle( PP_RevisionAttr& ra )
 }
 
 
-bool
-ODe_Text_Listener::openSpanForRevisionToBuffer( const PP_Revision* pAP,
-                                                std::stringstream& ss,
-                                                std::stringstream& postss )
-{
-    bool ret = false;
-    std::string styleName = ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles );
-    if (!styleName.empty())
-    {
-        ret = true;
-        UT_UTF8String output = "<text:span";
-        ODe_writeAttribute(output, "text:style-name", ODe_Style_Style::convertStyleToNCName(styleName) );
-        UT_DEBUGMSG(("openSpanForRevisionToBuffer(0) r->getId():%d\n", (int)pAP->getId() ));
-        UT_DEBUGMSG(("openSpanForRevisionToBuffer(1) style:%s\n", styleName.c_str() ));
-        UT_DEBUGMSG(("openSpanForRevisionToBuffer(2) style:%s\n", ODe_Style_Style::convertStyleToNCName(styleName).utf8_str() ));
-        UT_uint32       styleRev = pAP->getId();
-        PP_RevisionType styleOp  = pAP->getType();
-        
-        if( styleRev )
-        {
-            ODe_writeAttribute(output, "delta:insertion-change-idref", styleRev );
-            std::string insertionType = "";
-            if( styleOp == PP_REVISION_ADDITION || PP_REVISION_FMT_CHANGE )
-            {
-                insertionType = "insert-around-content";
-            }
-            if( !insertionType.empty() )
-            {
-                ODe_writeAttribute(output, "delta:insertion-type", insertionType );
-            }
-        }
-
-        ss << output.utf8_str();
-        if( !ss.str().empty() )
-            postss << "</text:span>";
-    }
-    return ret;
-}
-
-
+/**
+ * Given a string stream, you want to add prefix before the contents
+ * already in that stream. The passed string stream is modified to be
+ * "prefix"."old" and returned.
+ */
 static std::stringstream&
 prepend( std::stringstream& ss, const std::stringstream& prefix )
 {
@@ -452,14 +433,16 @@ prepend( std::stringstream& ss, const std::stringstream& prefix )
 void
 ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
 {
-    std::string styleName;
-//    bool ok;
-    const gchar* pValue;
+    std::string     styleName;
+    const gchar*    pValue   = 0;
     UT_uint32       styleRev = 0;
     PP_RevisionType styleOp  = PP_REVISION_NONE;
     
     UT_DEBUGMSG(("ODe_Text_Listener::openSpan(TOP)\n"));
 
+    /**
+     * The the quick route if there is no change tracking that needs to be processed.
+     */
     if( !useChangeTracking() )
     {
         styleName = ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles );
@@ -484,12 +467,10 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
     if( ctp )
     {
         ODe_ChangeTrackingParagraph_Data& d = ctp->getData();
-        
         UT_DEBUGMSG(("Text_Listener::openSpan() wv:%d sv:%d ev:%d\n",
-                     ctp->getData().getParagraphDeletedVersion(),
-                     ctp->getData().getParagraphStartDeletedVersion(),
-                     ctp->getData().getParagraphEndDeletedVersion()
-                        ));
+                     d.getParagraphDeletedVersion(),
+                     d.getParagraphStartDeletedVersion(),
+                     d.getParagraphEndDeletedVersion() ));
         
         // ADD:
         // ...  <delta:inserted-text-start delta:inserted-text-id="it632507360" 
@@ -717,23 +698,14 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
             //
             {
                 std::stringstream press;
-                std::stringstream postss;
+                std::string styleName = ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles );
 
                 UT_DEBUGMSG(("hasTextStyleProps:%d\n", ODe_Style_Style::hasTextStyleProps( pAP ) ));
                 UT_DEBUGMSG(("font-weight:%s\n", UT_getAttribute( pAP, "font-weight", "none" ) ));
                 UT_DEBUGMSG((" font-style:%s\n", UT_getAttribute( pAP, "font-style", "none" ) ));
-                {
-                    const gchar* pValue;
-                    bool ok = pAP->getProperty("font-weight", pValue);
-                    if (ok && pValue != NULL) {
-                        UT_DEBUGMSG(("font-weight2:%s\n", UT_getAttribute( pAP, "font-weight", "none" ) ));
-                    }
-                }
+                UT_DEBUGMSG(("xx1 style:%s\n", styleName.c_str() ));
+                UT_DEBUGMSG(("xx1 ra:%s\n",    ra.getXMLstring() ));
 
-                
-                std::string styleName = ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles );
-                UT_DEBUGMSG(("openSpanForRevisionToBuffer(ta) xx1 style:%s\n", styleName.c_str() ));
-                UT_DEBUGMSG(("openSpanForRevisionToBuffer(ta) xx1 ra:%s\n", ra.getXMLstring() ));
                 if (!styleName.empty())
                 {
                     openedSpan = true;
@@ -743,7 +715,6 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
 
                     press << "<text:span " << "text:style-name=\"" << ODe_Style_Style::convertStyleToNCName(styleName).utf8_str() << "\"";
 
-//                    styleRev = ra.getLastRevision()->getId();
                     UT_DEBUGMSG(("Text_Listener::openSpan(2) styleRev:%d\n", styleRev ));
                     UT_DEBUGMSG(("Text_Listener::openSpan(2) styleOp :%d\n", styleOp ));
                     if( styleRev )
@@ -760,14 +731,11 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
                         }
                     }
                     
-                    postss << "</text:span>";
+                    postambless << "</text:span>";
                 }
 
-                ODe_writeUTF8String( m_pParagraphContent, press.str().c_str() );
-                postambless << postss.str();
+                ODe_writeString( m_pParagraphContent, press.str() );
                 spanidref = styleRev;
-//                if( const PP_Revision * r = ra.getLastRevision() )
-//                    spanidref = r->getId() - 1;
             }
 
             //
@@ -789,33 +757,6 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
             }
 //            aclist.push_front( &defaultAttrs );
             
-            
-            // for( long raIdx = ra.getRevisionsCount()-1;
-            //      raIdx >= 0 && (r = ra.getNthRevision( raIdx ));
-            //      --raIdx )
-            // {
-            //     std::stringstream press;
-            //     std::stringstream postss;
-
-            //     if( !openedSpan )
-            //     {
-            //         openedSpan |= openSpanForRevisionToBuffer( r, press, postss );
-                    
-            //         ODe_writeUTF8String( m_pParagraphContent, press.str().c_str() );
-            //         postambless << postss.str();
-            //         spanidref = r->getId();
-            //         aclist.push_front( r );
-            //     }
-            //     else
-            //     {
-            //         aclist.push_front( r );
-
-            //         UT_DEBUGMSG(("openspan() ac:change revid:%d style-name:%s\n",
-            //                      r->getId(),
-            //                      ODe_Style_Style::getTextStyleProps( pAP, m_rAutomatiStyles ).c_str() ));
-            //     }
-            // }
-
             ODe_ChangeTrackingACChange acChange;
             acChange.setCurrentRevision( spanidref );
             acChange.setAttributeLookupFunction( "text:style-name", acChange.getLookupODFStyleFunctor( m_rAutomatiStyles, m_rStyles ) );
@@ -862,11 +803,9 @@ void ODe_Text_Listener::closeSpan()
             m_ctpTextSpanEnclosingElementCloseStreamStack.pop_back();
             
             UT_DEBUGMSG(("closeSpan() s:%s\n", s.c_str() ));
-
             if(!s.empty())
             {
-//              ODe_writeUTF8String( m_pParagraphContent, "<!-- ODe_Text_Listener::closeSpan() postamble... -->" );
-                ODe_writeUTF8String( m_pParagraphContent, s.c_str() );
+                ODe_writeString( m_pParagraphContent, s );
             }
         }
     }
@@ -1960,49 +1899,6 @@ std::string getODFChangeID( const PP_AttrProp* pAP, UT_uint32 xid )
 }
 
 
-bool isTrue( const char* s )
-{
-    if( !s )
-        return false;
-    if( !strcmp(s,"0"))
-        return false;
-    if( !strcmp(s,"false"))
-        return false;
-    return true;
-}
-
-
-ODe_Text_Listener::stringlist_t
-ODe_Text_Listener::convertRevisionStringToAttributeStack( const PP_AttrProp* pAP,
-                                                          const char* attrName,
-                                                          const char* attrDefault )
-{
-    std::list< std::string > ret;
-
-    if( attrDefault )
-        ret.push_back( attrDefault );
-    
-    if( const char* revisionString = UT_getAttribute( pAP, "revision", 0 ))
-    {
-        PP_RevisionAttr ra( revisionString );
-        const PP_Revision* r = 0;
-
-        for( UT_uint32 raIdx = 0;
-             raIdx < ra.getRevisionsCount() && (r = ra.getNthRevision( raIdx ));
-             raIdx++ )
-        {
-            const gchar*  a =  r->getAttrsString();
-            UT_DEBUGMSG(("ODTCT revisions idx:%d id:%d t:%d a:%s\n", raIdx, r->getId(), r->getType(), a ));
-
-            if( const char* x = UT_getAttribute( r, attrName, 0 ))
-                ret.push_back( x );
-        }
-    }
-
-    
-    return ret;
-}
-
 std::string UT_getLatestAttribute( const PP_AttrProp* pAP,
                                    const char* name,
                                    const char* def )
@@ -2226,6 +2122,9 @@ ODe_Text_Listener::_openODParagraphToBuffer( const PP_AttrProp* pAP,
 }
 
 
+/**
+ * return true of the paragraph fpr pAP is a heading
+ */
 bool
 ODe_Text_Listener::isHeading( const PP_AttrProp* pAP ) const
 {
@@ -2234,6 +2133,9 @@ ODe_Text_Listener::isHeading( const PP_AttrProp* pAP ) const
     return outlineLevel > 0;
 }
 
+/**
+ * True if there is a change either to or from a heading between the two pAP.
+ */
 bool
 ODe_Text_Listener::headingStateChanges( const PP_AttrProp* pAPa, const PP_AttrProp* pAPb ) const
 {
@@ -2500,24 +2402,6 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
         //     }
         // }
         
-        
-        // std::list< std::string > sl = convertRevisionStringToAttributeStack( pAP, "style", "Normal" );
-        // for( stringlist_t::iterator si = sl.begin(); si != sl.end(); ++si )
-        // {
-        //     UT_DEBUGMSG(("ODTCT style stack:%s\n", si->c_str() ));
-
-            
-
-        //     // int outlineLevel = m_rAuxiliaryData.m_headingStyles.getHeadingOutlineLevel(pValue);
-        //     // bool isHeading = (outlineLevel > 0);
-
-        //     // if( isHeading )
-        //     // {
-        //     // }
-        //     // else
-        //     // {
-        //     // }
-        // }
     }
     
     // if( const char* revisionString = UT_getAttribute( pAP, "revision", 0 ))
@@ -2924,6 +2808,14 @@ void ODe_Text_Listener::_closeODParagraph() {
     }
 }
 
+/**
+ * Write a key="value" pair, escaping the value so it can be contained
+ * in an XML attribute. Note that the UTF8String from the first
+ * argument is both written too and returned.
+ *
+ * So you could chain call like:
+ * appendAttribute( appendAttribute( ret, "a", "b" ), "c", "d" );
+ */
 UT_UTF8String& ODe_Text_Listener::appendAttribute(
     UT_UTF8String& ret,
     const char* key,
