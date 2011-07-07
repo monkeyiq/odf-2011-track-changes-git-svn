@@ -41,6 +41,7 @@
 class UT_Rect;
 class UT_String;
 class UT_UTF8String;
+class PP_AttrProp;
 
 
 // ----------------------------------------------------------------
@@ -88,6 +89,9 @@ ABI_EXPORT const gchar* UT_getAttribute( const gchar* name,
  */
 ABI_EXPORT const gchar* UT_getAttribute( const gchar* name,
                                          const gchar** atts, const gchar* def );
+
+
+
 
 
 /**

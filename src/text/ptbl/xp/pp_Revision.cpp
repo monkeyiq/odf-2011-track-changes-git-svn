@@ -1608,3 +1608,40 @@ PP_RevisionAttr::getLowestDeletionRevision() const
     return 0;
 }
 
+
+std::string UT_getLatestAttribute( const PP_AttrProp* pAP,
+                                   const char* name,
+                                   const char* def )
+{
+    const char* t = 0;
+    std::string ret = def;
+    bool ok = false;
+    
+    if( const char* revisionString = UT_getAttribute( pAP, "revision", 0 ))
+    {
+        PP_RevisionAttr ra( revisionString );
+        const PP_Revision* r = 0;
+            
+        for( int raIdx = ra.getRevisionsCount()-1;
+             raIdx >= 0 && (r = ra.getNthRevision( raIdx ));
+             --raIdx )
+        {
+            ok = r->getAttribute( name, t );
+            if (ok)
+            {
+                ret = t;
+                return ret;
+            }
+        }
+    }
+
+    ok = pAP->getAttribute( name, t );
+    if (ok)
+    {
+        ret = t;
+        return ret;
+    }
+    ret = def;
+    
+    return ret;
+}

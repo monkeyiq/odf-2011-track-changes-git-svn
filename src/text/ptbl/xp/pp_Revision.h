@@ -28,6 +28,13 @@
 class PD_Document;
 
 ABI_EXPORT const char* UT_getAttribute( const PP_AttrProp* pAP, const char* name, const char* def = 0 );
+/**
+ * Like UT_getAttribute(name,atts,def) but check for a revision attribute and
+ * if found first look for the most recent value of atts in the revision.
+ */
+ABI_EXPORT std::string UT_getLatestAttribute( const PP_AttrProp* pAP,
+                                              const char* name,
+                                              const char* def );
 
 typedef enum {
 	PP_REVISION_NONE             = 0,
@@ -165,6 +172,8 @@ class ABI_EXPORT PP_RevisionAttr
 
     UT_uint32             getHighestId() const;
 	UT_uint32             getRevisionsCount() const {return m_vRev.getItemCount();}
+    bool                  empty() const { return !getRevisionsCount(); }
+    
 	const PP_Revision *   getNthRevision(UT_uint32 n) const {return (const PP_Revision*)m_vRev.getNthItem(n);}
 	
 	void                  pruneForCumulativeResult(PD_Document * pDoc);

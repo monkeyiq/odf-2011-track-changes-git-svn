@@ -27,6 +27,8 @@
 // to read odt/content.xml files
 //#define DEBUGGING_ADD_NEWLINES 0
 
+
+
 bool
 ODe_ChangeTrackingDeltaMerge::isDifferentRevision( const PP_RevisionAttr& ra )
 {

@@ -317,6 +317,8 @@ const gchar* UT_getAttribute(const gchar* name, const gchar** atts)
 }
 
 
+
+
 bool isTrue( const char* s )
 {
     if( !s )
