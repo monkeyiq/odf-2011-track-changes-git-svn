@@ -669,7 +669,7 @@ ODe_Text_Listener::openSpan( const PP_AttrProp* pAP )
                             std::string itid  = m_ctIdFactory.createId();
                             std::stringstream ss;
                             ss << endl
-                               << "<delta:removed-content  RR=\"2\" "
+                               << "<delta:removed-content " //   RR=\"2\" "
                                << " delta:removed-text-id="
                                << "\"" << itid << "\""
                                << " delta:removal-change-idref="
@@ -2407,7 +2407,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
             }
             else
             {
-                UT_DEBUGMSG(("ODTCT STARTDELMER <delta:merge> for id:%s\n",d.getSplitID().c_str()));
+                UT_DEBUGMSG(("ODTCT STARTDELMER <delta:merge> for id:%s\n", d.getSplitID().c_str()));
 
                 ODe_ChangeTrackingDeltaMerge dm( m_rAuxiliaryData, d.m_maxParaDeletedRevision );
                 dm.setState( ODe_ChangeTrackingDeltaMerge::DM_TRAILING );
@@ -2423,7 +2423,7 @@ ODe_Text_Listener::_openODParagraph( const PP_AttrProp* pAP )
             const char* moveID = UT_getAttribute( pAP, "delta:move-id", 0 );
 
             UT_DEBUGMSG(("delta: paragraph is deleted...\n"));
-            ctpTextPEnclosingElementStream << "<delta:removed-content   RR=\"1\" "
+            ctpTextPEnclosingElementStream << "<delta:removed-content " //   RR=\"1\" "
                                            << " delta:removal-change-idref=\""
                                            << d.getVersionWhichRemovesParagraph()
                                            << "\"";
