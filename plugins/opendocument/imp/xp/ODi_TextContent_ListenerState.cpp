@@ -351,6 +351,18 @@ static bool hasTextStyleProps( const PP_RevisionAttr& ra )
     return ret;
 }
 
+static void dump( const std::string& hdr, std::list< std::pair< PP_RevisionType, std::string > >& stack )
+{
+#ifdef DEBUG
+    UT_DEBUGMSG(("dump() stack.sz:%d %s\n", stack.size(), hdr.c_str() ));
+    for( std::list< std::pair< PP_RevisionType, std::string > >::iterator iter = stack.begin();
+         iter != stack.end(); ++iter )
+    {
+        UT_DEBUGMSG(("type:%d ver:%s\n", iter->first, iter->second.c_str() ));
+    }
+#endif
+}
+
 /************************************************************/
 /************************************************************/
 /************************************************************/
@@ -3272,18 +3284,15 @@ void ODi_TextContent_ListenerState::_insertAnnotation() {
     m_bPendingAnnotation = false;
 }
 
+
+/**
+ * Add the revisions from the stack to the given revisionattr
+ */
 PP_RevisionAttr&
 ODi_TextContent_ListenerState::ctAddRemoveStackSetup( PP_RevisionAttr& ra, m_ctAddRemoveStack_t& stack )
 {
-#ifdef DEBUG
-    UT_DEBUGMSG(("ODi_TextContent_ListenerState::ctAddRemoveStackSetup() st.sz:%d\n", stack.size() ));
-    for( m_ctAddRemoveStack_t::iterator iter = stack.begin();
-         iter != stack.end(); ++iter )
-    {
-        UT_DEBUGMSG(("type:%d ver:%s\n", iter->first, iter->second.c_str() ));
-    }
-#endif
-    
+    dump( "ODi_TextContent_ListenerState::ctAddRemoveStackSetup()", stack );
+
     for( m_ctAddRemoveStack_t::iterator iter = stack.begin();
          iter != stack.end(); ++iter )
     {
@@ -3295,6 +3304,9 @@ ODi_TextContent_ListenerState::ctAddRemoveStackSetup( PP_RevisionAttr& ra, m_ctA
     return ra;
 }
 
+/**
+ * Get the last revision of a specific type from the stack m_ctAddRemoveStack
+ */
 std::string
 ODi_TextContent_ListenerState::ctAddRemoveStackGetLast( PP_RevisionType t )
 {
@@ -3312,6 +3324,9 @@ ODi_TextContent_ListenerState::ctAddRemoveStackGetLast( PP_RevisionType t )
 }
 
 
+/**
+ * Delegates to ODi_ChangeTrackingACChange::ctAddACChange().
+ */
 PP_RevisionAttr&
 ODi_TextContent_ListenerState::ctAddACChange( PP_RevisionAttr& ra, const gchar** ppAtts )
 {
@@ -3322,8 +3337,17 @@ ODi_TextContent_ListenerState::ctAddACChange( PP_RevisionAttr& ra, const gchar**
     return ra;
 }
 
+
+/**
+ * Add all the styles of a given type from ppAtts to the revisionAttr
+ * ra and return it. The style type can be either StylePara or
+ * StyleText. Note that the ac:change attributes from ppAtts are also
+ * considered where they relate to the text:style-name attribute.
+ */
 PP_RevisionAttr&
-ODi_TextContent_ListenerState::ctAddACChangeODFTextStyle( PP_RevisionAttr& ra, const gchar** ppAtts, ODi_Office_Styles::StyleType t )
+ODi_TextContent_ListenerState::ctAddACChangeODFTextStyle( PP_RevisionAttr& ra,
+                                                          const gchar** ppAtts,
+                                                          ODi_Office_Styles::StyleType t )
 {
     PP_RevisionAttr x;
     ODi_ChangeTrackingACChange ct( this );
@@ -3354,7 +3378,10 @@ ODi_TextContent_ListenerState::ctAddACChangeODFTextStyle( PP_RevisionAttr& ra, c
     return ra;
 }
 
-
+/**
+ * Convert the ODF attributes and ac:change history for them into an
+ * abiword RevisionAttr object.
+ */
 PP_RevisionAttr
 ODi_TextContent_ListenerState::ctGetACChange( const gchar** ppAtts )
 {
