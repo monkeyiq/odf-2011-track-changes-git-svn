@@ -77,6 +77,14 @@ public:
     {
         m_array.assign( 0 );
     }
+    propertyArray( const gchar* k, const gchar* v )
+        :
+        m_highestUsedIndex( 0 )
+    {
+        m_array.assign( 0 );
+        set( k, v );
+    }
+
     
     void push_back( const gchar* v )
     {
@@ -84,6 +92,13 @@ public:
         m_array.at(sz) = v;
         m_highestUsedIndex++;
     }
+
+    void set( const gchar* k, const gchar* v )
+    {
+        push_back( k );
+        push_back( v );
+    }
+
 
     std::size_t count() const
     {

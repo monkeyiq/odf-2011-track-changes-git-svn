@@ -265,6 +265,9 @@ static bool starts_with( const std::string& s, const std::string& starting )
     return !s.compare( 0, starting_len, starting );
 }
 
+/**
+ * Find the smallest revision number among "ra" and cv.
+ */
 static UT_uint32 getIntroducingVersion( UT_uint32 cv, const PP_RevisionAttr& ra )
 {
     UT_uint32 ret = cv;
@@ -338,10 +341,10 @@ static bool hasTextStyleProps( const PP_RevisionAttr& ra )
     for(UT_uint32 i = 0; i < ra.getRevisionsCount() && !ret; ++i)
     {
         const PP_Revision* r = ra.getNthRevision(i);
+        ret |= hasTextStyleProps(r);
+
         UT_DEBUGMSG(("hasTextStyleProps() i:%d id:%d ret:%d\n", i, r->getId(), ret ));
         UT_DEBUGMSG(("hasTextStyleProps() has-prop-style:%d\n", haveAttr( r, "style" ) ));
-
-        ret |= hasTextStyleProps(r);
     }
 
     UT_DEBUGMSG(("hasTextStyleProps() end ret:%d\n", ret ));
@@ -407,7 +410,7 @@ ODi_TextContent_ListenerState::ODi_TextContent_ListenerState (
     setChangeTrackingRevisionMapping( pAbiCTMap );
 
     //
-    // CT: We start the stack in a "normal" mode.
+    // CT: We start the span stack in a "normal" mode.
     //
     spanStyle z;
     z.m_attr = "props";
@@ -455,8 +458,7 @@ ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH( const g
         
         const gchar ** pProps = 0;
         propertyArray<> ppAtts;
-        ppAtts.push_back( "style" );
-        ppAtts.push_back( styleName.c_str() );
+        ppAtts.set( "style", styleName.c_str() );
         m_ctLeadingElementChangedRevision.addRevision( fromChangeID(chIDRef),
                                                        PP_REVISION_FMT_CHANGE,
                                                        ppAtts.data(), pProps );
@@ -474,15 +476,14 @@ static std::string getDefaultStyle( PD_Document* pDoc, std::string s )
     std::string key = s.substr( 0, s.find(":"));
     UT_DEBUGMSG(("getDefaultStyle() doc:%p s:%s key:%s\n", pDoc, s.c_str(), key.c_str() ));
 
-    
-    const char * pDefaultStyleName = pDoc->getDefaultStyle();
+    bool ok = false;
+    const gchar* szValue = 0;
     PD_Style*    pStyle  = 0;
+    const char * pDefaultStyleName = pDoc->getDefaultStyle();
+
     pDoc->getStyle( "Normal", &pStyle );
     if( pStyle )
     {
-        bool ok = false;
-        const gchar* szValue = 0;
-//        const char * pStyleName = PD_Document::getDefaultStyle();
         ok = pStyle->getProperty( key.c_str(), szValue );
         UT_DEBUGMSG(("getDefaultStyle() pc:%d\n", pStyle->getPropertyCount() ));
         UT_DEBUGMSG(("getDefaultStyle() ac:%d\n", pStyle->getAttributeCount() ));
@@ -672,20 +673,20 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
     }
     else if (!strcmp(pName, "delta:remove-leaving-content-start" ))
     {
-        m_ctInsideRemoveLeavingContentStartElement = true;
         UT_DEBUGMSG(("delta:remove-leaving-content-start (begin)\n" ));
+
+        m_ctInsideRemoveLeavingContentStartElement = true;
         std::string chIDRef = UT_getAttribute("delta:removal-change-idref", ppAtts, "0" );
         std::string eeIDRef = UT_getAttribute("delta:end-element-idref",    ppAtts, "" );
+        m_ctRemoveLeavingContentStack.push_back( make_pair( chIDRef, eeIDRef ) );
 
         UT_DEBUGMSG(("delta:remove-leaving-content-start chIDRef:%s\n", chIDRef.c_str() ));
         UT_DEBUGMSG(("delta:remove-leaving-content-start eeIDRef:%s\n", eeIDRef.c_str() ));
-        
-        m_ctRemoveLeavingContentStack.push_back( make_pair( chIDRef, eeIDRef ) );
     }
     else if (!strcmp(pName, "delta:remove-leaving-content-end" ))
     {
         UT_DEBUGMSG(("delta:remove-leaving-content-end (begin)\n" ));
-        
+
     }
     else if (!strcmp(pName, "delta:merge" ))
     {
@@ -716,16 +717,11 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
             if( strcmp(ctRevision.getXMLstring(),"0"))
             {
                 UT_DEBUGMSG(("delta:revision:%s\n", ctRevision.getXMLstring()));
-                const gchar* ppAtts[10];
-                bzero(ppAtts, 10 * sizeof(gchar*));
-                int i=0;
-                ppAtts[i++] = PT_REVISION_ATTRIBUTE_NAME;
-                ppAtts[i++] = ctRevision.getXMLstring();
-                ppAtts[i++] = "baz";
-                ppAtts[i++] = "updated3";
-                ppAtts[i++] = 0;
+                propertyArray<> ppAtts;
+                ppAtts.set( PT_REVISION_ATTRIBUTE_NAME, ctRevision.getXMLstring() );
+
                 m_ctHaveParagraphFmt = true;
-                _pushInlineFmt(ppAtts);
+                _pushInlineFmt(ppAtts.data());
                 bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
                 UT_ASSERT(ok);
             }
@@ -902,8 +898,7 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
             if( !moveID.empty() )
             {
                 propertyArray<> ppAtts;
-                ppAtts.push_back( "delta:move-id" );
-                ppAtts.push_back( moveID.c_str() );
+                ppAtts.set( "delta:move-id", moveID.c_str() );
                 _pushInlineFmt(ppAtts.data());
                 bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
                 UT_ASSERT(ok);
@@ -929,8 +924,7 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                     UT_DEBUGMSG(("delta:revision:%s\n", ctRevision.getXMLstring()));
 
                     propertyArray<> ppAtts;
-                    ppAtts.push_back( PT_REVISION_ATTRIBUTE_NAME );
-                    ppAtts.push_back( ctRevision.getXMLstring() );
+                    ppAtts.set( PT_REVISION_ATTRIBUTE_NAME, ctRevision.getXMLstring() );
                     _pushInlineFmt(ppAtts.data());
                     bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
                     UT_ASSERT(ok);
@@ -1112,14 +1106,10 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                 if( strcmp( ctRevision.getXMLstring(), "0" ))
                 {
                     UT_DEBUGMSG(("ODTCT start of text:span rev:%s\n", ctRevision.getXMLstring() ));
-                
-                    const gchar* ppAtts[10];
-                    bzero(ppAtts, 10 * sizeof(gchar*));
-                    int i=0;
-                    ppAtts[i++] = PT_REVISION_ATTRIBUTE_NAME;
-                    ppAtts[i++] = ctRevision.getXMLstring();
-                    ppAtts[i++] = 0;
-                    _pushInlineFmt(ppAtts);
+
+                    propertyArray<> ppAtts;
+                    ppAtts.set( PT_REVISION_ATTRIBUTE_NAME, ctRevision.getXMLstring() );
+                    _pushInlineFmt(ppAtts.data());
                     bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
                     UT_ASSERT(ok);
                     m_ctHaveSpanFmt = true;
@@ -1784,12 +1774,10 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
                     {
                         UT_DEBUGMSG(("ODTCT: loading delta:merge revision:%s\n", pValue ));
                         PP_RevisionAttr Revisions(pValue);
-                        
-                        const gchar* ppAtts[10];
-                        ppAtts[0] = ABIATTR_PARA_END_DELETED_REVISION;
-                        ppAtts[1] = m_mergeIDRef.c_str();
-                        ppAtts[2] = 0;
-                        Revisions.addRevision(1,PP_REVISION_FMT_CHANGE,ppAtts,NULL);
+
+                        propertyArray<> ppAtts;
+                        ppAtts.set( ABIATTR_PARA_END_DELETED_REVISION, m_mergeIDRef.c_str() );
+                        Revisions.addRevision(1,PP_REVISION_FMT_CHANGE,ppAtts.data(),NULL);
                         UT_DEBUGMSG(("ODTCT: loading delta:merge updated revision:%s\n", Revisions.getXMLstring() ));
 
                         const gchar * ppRevAttrib[3];
@@ -1845,13 +1833,9 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
                 
             if( strcmp( ctRevision.getXMLstring(), "0" ))
             {
-                const gchar* ppAtts[10];
-                bzero(ppAtts, 10 * sizeof(gchar*));
-                int i=0;
-                ppAtts[i++] = PT_REVISION_ATTRIBUTE_NAME;
-                ppAtts[i++] = ctRevision.getXMLstring();
-                ppAtts[i++] = 0;
-                _pushInlineFmt(ppAtts);
+                propertyArray<> ppAtts;
+                ppAtts.set( PT_REVISION_ATTRIBUTE_NAME, ctRevision.getXMLstring() );
+                _pushInlineFmt(ppAtts.data());
                 bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
                 UT_ASSERT(ok);
                 m_ctHaveParagraphFmt = true;
@@ -2781,9 +2765,7 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         
                 const gchar ** pProps = 0;
                 propertyArray<> ppAtts;
-                ppAtts.push_back( "style" );
-                ppAtts.push_back( pStyle->getDisplayName().utf8_str() );
-
+                ppAtts.set( "style", pStyle->getDisplayName().utf8_str() );
                 ctRevision.addRevision( fromChangeID(id),
                                         PP_REVISION_FMT_CHANGE,
                                         ppAtts.data(), pProps );
@@ -2978,6 +2960,7 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             {
                 UT_DEBUGMSG(("ODTCT ctRevision.addRevision() delparaA rev:%d\n", m_ctParagraphDeletedRevision ));
                 UT_DEBUGMSG(("ODTCT ctRevision.addRevision() ctrevA:%s\n", ctRevision.getXMLstring() ));
+
                 ctRevision.mergeAttrIfNotAlreadyThere( 1, PP_REVISION_ADDITION_AND_FMT,
                                                        ABIATTR_PARA_DELETED_REVISION,
                                                        tostr(m_ctParagraphDeletedRevision).c_str() );
@@ -3057,27 +3040,12 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             }
 
             std::string revString = ctRevision.getXMLstring();
-            const gchar* ppAtts[20];
-            bzero(ppAtts, 20 * sizeof(gchar*));
-            int i=0;
+            propertyArray<> ppAtts;
             if( revString != "0" )
             {
-                ppAtts[i++] = PT_REVISION_ATTRIBUTE_NAME;
-                if( !m_mergeIDRef.empty() )
-                {
-                    ppAtts[i++] = revString.c_str();
-                    // ppAtts[i++] = "foo";
-                    // ppAtts[i++] = "bar";
-                }
-                else
-                {
-                    ppAtts[i++] = revString.c_str();
-                    // ppAtts[i++] = "baz";
-                    // ppAtts[i++] = "1";
-                }
+                ppAtts.set( PT_REVISION_ATTRIBUTE_NAME, revString.c_str() );
             }
-            ppAtts[i++] = 0;
-            _pushInlineFmt(ppAtts);
+            _pushInlineFmt(ppAtts.data());
             bool ok = m_pAbiDocument->appendFmt(&m_vecInlineFmt);
             UT_ASSERT(ok);
             m_ctHaveParagraphFmt = true;
@@ -3085,7 +3053,7 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             UT_DEBUGMSG(("ODTCT ADD revString:%s\n", revString.c_str() ));
 
             // MIQ: force a <c> tag with this
-            _pushInlineFmt(ppAtts);
+            _pushInlineFmt(ppAtts.data());
             m_pAbiDocument->appendFmt(&m_vecInlineFmt);
         }
 
@@ -3300,11 +3268,18 @@ void ODi_TextContent_ListenerState::_insertAnnotation() {
 PP_RevisionAttr&
 ODi_TextContent_ListenerState::ctAddRemoveStackSetup( PP_RevisionAttr& ra, m_ctAddRemoveStack_t& stack )
 {
+#ifdef DEBUG
     UT_DEBUGMSG(("ODi_TextContent_ListenerState::ctAddRemoveStackSetup() st.sz:%d\n", stack.size() ));
     for( m_ctAddRemoveStack_t::iterator iter = stack.begin();
          iter != stack.end(); ++iter )
     {
         UT_DEBUGMSG(("type:%d ver:%s\n", iter->first, iter->second.c_str() ));
+    }
+#endif
+    
+    for( m_ctAddRemoveStack_t::iterator iter = stack.begin();
+         iter != stack.end(); ++iter )
+    {
         if( !iter->second.empty() )
         {
             ra.addRevision( fromChangeID( iter->second ), iter->first );
@@ -3386,7 +3361,6 @@ ODi_TextContent_ListenerState::spanStyle::init( const ODi_Style_Style* pStyle )
 {
     if (pStyle)
     {
-
         UT_DEBUGMSG(("ODTCT spanStyle() auto:%d dn:%s\n",
                      pStyle->isAutomatic(), pStyle->getDisplayName().utf8_str() ));
 
