@@ -435,6 +435,20 @@ ODi_TextContent_ListenerState::~ODi_TextContent_ListenerState()
 }
 
 
+/**
+ * This method does nothing unless we are between a
+ * <delta:remove-leaving-content-start/> and
+ * <delta:remove-leaving-content-end/>. Nesting of these XML elements
+ * is handled because we are using a stack.
+ *
+ * Otherwise it will inspect the given ppAtts and build up
+ * m_ctLeadingElementChangedRevision. The _startParagraphElement()
+ * method uses m_ctLeadingElementChangedRevision as the default style
+ * revision attribute to base it's changes on.
+ *
+ * This method is called in startElement() when a text:p or text:h is
+ * found.
+ */
 void
 ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH( const gchar* pName,
                                                                          const gchar** ppAtts )
@@ -444,24 +458,28 @@ ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH( const g
         std::string chIDRef = m_ctRemoveLeavingContentStack.back().first;
         std::string eeIDRef = m_ctRemoveLeavingContentStack.back().second;
         std::string styleName = UT_getAttribute ("text:style-name", ppAtts);
+        const ODi_Style_Style* pStyle = getParagraphStyle( styleName.c_str() );
 
+#ifdef DEBUG
         UT_DEBUGMSG(("text:x INSIDE rlc-start element chIDRef:%s\n", chIDRef.c_str() ));
         UT_DEBUGMSG(("text:x INSIDE rlc-start element eeIDRef:%s\n", eeIDRef.c_str() ));
         UT_DEBUGMSG(("text:x1 style:%s\n", styleName.c_str() ));
+        if( pStyle )
+            UT_DEBUGMSG(("text:x2 pstyle.name:%s\n", pStyle->getDisplayName().utf8_str() ));
+#endif
 
-        const ODi_Style_Style* pStyle = getParagraphStyle( styleName.c_str() );
+        
         if( pStyle )
             styleName = pStyle->getDisplayName().utf8_str();
-        UT_DEBUGMSG(("text:x2 style:%s\n", styleName.c_str() ));
 
         ctAddACChangeODFTextStyle( m_ctLeadingElementChangedRevision, ppAtts, ODi_Office_Styles::StylePara );
         
-        const gchar ** pProps = 0;
-        propertyArray<> ppAtts;
-        ppAtts.set( "style", styleName.c_str() );
+        propertyArray<> pa;
+        pa.set( "style", styleName.c_str() );
         m_ctLeadingElementChangedRevision.addRevision( fromChangeID(chIDRef),
                                                        PP_REVISION_FMT_CHANGE,
-                                                       ppAtts.data(), pProps );
+                                                       pa.data(), 0 );
+
         UT_DEBUGMSG(("text:x rev:%s\n", m_ctLeadingElementChangedRevision.getXMLstring() ));
     }
     
@@ -548,21 +566,10 @@ ODi_TextContent_ListenerState::ctSimplifyStyles( PP_RevisionAttr& ra )
         UT_DEBUGMSG(("ctSimplifyStyles(   s)     :%s\n", s.c_str() ));
 
         rass << ",!" << r->getId() << "{" << s << "}{" << r->getAttrsString() << "}";
-        
-//        std::string uptoCurrent = ra.getXMLstringUpTo( r->getId() );
-//        PP_RevisionAttr prev;
-//        prev.setRevision( uptoCurrent.c_str() );
-        // UT_DEBUGMSG(("ctSimplifyStyles(prev)   ra:%s\n", uptoCurrent.c_str() ));
-        
-        // prev.pruneForCumulativeResult( 0 );
-        // UT_DEBUGMSG(("ctSimplifyStyles(pruned) ra:%s\n", prev.getXMLstring() ));
-        
-        //ctSimplifyStyle( r, prev );
     }
-
-    
     UT_DEBUGMSG(("ctSimplifyStyles(end old) %s\n", ra.getXMLstring() ));
     UT_DEBUGMSG(("ctSimplifyStyles(end new) %s\n", rass.str().c_str() ));
+
     ra.setRevision( rass.str().c_str() );
 }
 

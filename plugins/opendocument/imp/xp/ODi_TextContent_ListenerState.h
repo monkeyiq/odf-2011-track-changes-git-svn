@@ -220,7 +220,6 @@ private:
     bool m_ctHaveSpanFmt;                   //< inside a text:span
     bool m_ctHaveParagraphFmt;              //< inside a text:p which has ct data
     long m_ctSpanDepth;                     //< count of current text:span nesting
-
     std::string m_mergeIDRef;                   //< delta:merge@removal-change-idref
     bool m_mergeIsInsideTrailingPartialContent; //< true when inside a delta:merge/delta:trailing-partial-content element
     bool m_mergeIsInsideIntermediateContent;    //< true when inside a delta:merge/delta:intermediate-content element
@@ -244,6 +243,14 @@ private:
     m_ctAddRemoveStack_t m_ctAddRemoveStack;
     PP_RevisionAttr& ctAddRemoveStackSetup( PP_RevisionAttr& ra, m_ctAddRemoveStack_t& stack );
     std::string ctAddRemoveStackGetLast( PP_RevisionType t );
+
+    /**
+     * Collect style revision information into a single class. The
+     * default style can be obtained with a method, the styles in a
+     * revisionattr can be harvested, and set() is used to add the
+     * style information from this object into an existing
+     * propertyArray.
+     */
     class spanStyle 
     {
         void init( const ODi_Style_Style* pStyle );
@@ -252,12 +259,18 @@ private:
         PP_RevisionType m_type;
         std::string     m_attr;
         std::string     m_prop;
-        spanStyle( const ODi_Style_Style* pStyle = 0, UT_uint32 rev = 0, PP_RevisionType rt = PP_REVISION_NONE );
+        
+        spanStyle( const ODi_Style_Style* pStyle = 0,
+                   UT_uint32 rev = 0,
+                   PP_RevisionType rt = PP_REVISION_NONE );
         const gchar** set( const gchar** ppAtts );
         PP_RevisionAttr& addRevision( PP_RevisionAttr& ra );
         static spanStyle getDefault();
     };
-    // This would be best as a list< PP_RevisionAttr > but there are some ownership issues
+    
+    //
+    // MIQ11: This would be best as a list< PP_RevisionAttr >
+    // but there are some memory ownership issues
     // with copying those which I'm not aware of yet.
     typedef std::list< std::string > m_ctSpanStack_t;
     m_ctSpanStack_t m_ctSpanStack;
@@ -271,9 +284,6 @@ private:
     // data for change tracking metadata using handleRemoveLeavingContentStartForTextPH()
     // but not actually add the normal text:p/text:h elements directly to the document
     bool m_ctInsideRemoveLeavingContentStartElement;
-    //
-    // Inspect ppParagraphAtts and build up m_ctLeadingElementChangedRevision
-    //
     void handleRemoveLeavingContentStartForTextPH( const gchar* pName, const gchar** ppParagraphAtts );
     
     //
@@ -281,15 +291,6 @@ private:
     // delta:remove-leaving-content-start elements proceeding a raw
     // text:p or text:h element.
     PP_RevisionAttr m_ctLeadingElementChangedRevision;
-
-    //
-    // ODF styles for headings are slightly different to those
-    // for Abiword abw format, this method should convert to an abiword
-    // style if one can be worked out.
-    // FIXME: MIQ: Delete this, it was a wrong assumption!
-    /* std::string convertODFStyleNameToAbiStyleName( const std::string odfStyleName, */
-    /*                                                ODi_Office_Styles* pStyles, */
-    /*                                                bool bOnContentStream ); */
 
     //
     //
