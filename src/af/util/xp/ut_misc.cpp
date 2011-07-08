@@ -742,3 +742,34 @@ UT_uint32 UT_hash32(const char * p, UT_uint32 bytelen)
 }
 
 #undef MYZERO
+
+
+std::string replace_all( const std::string& s,
+                         const std::string& olds,
+                         const std::string& news )
+{
+    std::string ret = s;
+    int olds_length = olds.length();
+    int news_length = news.length();
+            
+    int start = ret.find( olds );
+    while( start != std::string::npos )
+    {
+        ret.replace( start, olds_length, news );
+        start = ret.find( olds, start + news_length );
+    }
+    return ret;
+}
+
+
+
+bool starts_with( const std::string& s, const std::string& starting )
+{
+    int starting_len = starting.length();
+    int s_len = s.length();
+
+    if( s_len < starting_len )
+        return false;
+    
+    return !s.compare( 0, starting_len, starting );
+}

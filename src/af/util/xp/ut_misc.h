@@ -91,6 +91,21 @@ ABI_EXPORT const gchar* UT_getAttribute( const gchar* name,
                                          const gchar** atts, const gchar* def );
 
 
+/**
+ * Replace all occurances of olds with news in the string 's'.
+ */
+ABI_EXPORT std::string replace_all( const std::string& s,
+                                    const std::string& olds,
+                                    const std::string& news );
+
+
+/**
+ * True if the first param 's' starts with the second parameter 'starting'.
+ */
+ABI_EXPORT bool starts_with( const std::string& s, const std::string& starting );
+
+
+
 
 
 

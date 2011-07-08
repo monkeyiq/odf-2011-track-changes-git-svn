@@ -146,7 +146,7 @@ parseSeparatedList< std::set< std::string > ,
 }
 
 /**
- * Specialization allowing one to now supply the output iterator.
+ * Specialization allowing one to not supply the output iterator.
  */
 template< class Col >
 void parseSeparatedList( const std::string& s,
@@ -229,40 +229,6 @@ ParseKeyValueString( std::map< std::string, std::string >& ret,
             break;
     }
     return ret;
-}
-
-/**
- * Replace all occurances of olds with news in the string 's'.
- */
-std::string replace_all( const std::string& s,
-                         const std::string& olds,
-                         const std::string& news )
-{
-    std::string ret = s;
-    int olds_length = olds.length();
-    int news_length = news.length();
-            
-    int start = ret.find( olds );
-    while( start != std::string::npos )
-    {
-        ret.replace( start, olds_length, news );
-        start = ret.find( olds, start + news_length );
-    }
-    return ret;
-}
-
-/**
- * True if the first param 's' starts with the second parameter 'starting'.
- */
-static bool starts_with( const std::string& s, const std::string& starting )
-{
-    int starting_len = starting.length();
-    int s_len = s.length();
-
-    if( s_len < starting_len )
-        return false;
-    
-    return !s.compare( 0, starting_len, starting );
 }
 
 /**
@@ -451,12 +417,14 @@ ODi_TextContent_ListenerState::~ODi_TextContent_ListenerState()
  * This method does nothing unless we are between a
  * <delta:remove-leaving-content-start/> and
  * <delta:remove-leaving-content-end/>. Nesting of these XML elements
- * is handled because we are using a stack.
+ * is handled because we are using a stack for
+ * m_ctLeadingElementChangedRevision.
  *
- * Otherwise it will inspect the given ppAtts and build up
- * m_ctLeadingElementChangedRevision. The _startParagraphElement()
- * method uses m_ctLeadingElementChangedRevision as the default style
- * revision attribute to base it's changes on.
+ * If inside the above mentioned scope the method will inspect the
+ * given ppAtts and build up m_ctLeadingElementChangedRevision
+ * accordingly. The _startParagraphElement() method uses
+ * m_ctLeadingElementChangedRevision as the default style revision
+ * attribute to base it's changes on.
  *
  * This method is called in startElement() when a text:p or text:h is
  * found.
@@ -496,8 +464,6 @@ ODi_TextContent_ListenerState::handleRemoveLeavingContentStartForTextPH( const g
     }
     
 }
-
-
 
 
 #include "pd_Style.h"
@@ -551,6 +517,7 @@ static std::string getDefaultStyle( PD_Document* pDoc, std::string s )
     return s;
 }
 
+// see header for comment
 void
 ODi_TextContent_ListenerState::ctSimplifyStyles( PP_RevisionAttr& ra )
 {
@@ -587,6 +554,7 @@ ODi_TextContent_ListenerState::ctSimplifyStyles( PP_RevisionAttr& ra )
 
 
 
+// see header for comment
 std::string
 ODi_TextContent_ListenerState::ctSimplifyFromTwoAdjacentStyles( const PP_Revision * r, const PP_Revision * p )
 {
@@ -724,13 +692,16 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
         _popInlineFmt();
         m_pAbiDocument->appendFmt(&m_vecInlineFmt);
 
-        PP_RevisionAttr ctRevision;
-
         UT_DEBUGMSG(("delta:leading-partial-content gettting ADD version. stack.sz:%d\n",
                      m_ctAddRemoveStack.size() ));
+
+        PP_RevisionAttr ctRevision;
         ctAddRemoveStackSetup( ctRevision, m_ctAddRemoveStack );
         ctRevision.addRevision( fromChangeID(m_mergeIDRef), PP_REVISION_DELETION );
 
+        //
+        // If we have revision infomration then append it to the current format.
+        //
         if( strlen(ctRevision.getXMLstring()) )
         {
             if( strcmp(ctRevision.getXMLstring(),"0"))
@@ -966,6 +937,10 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
         
         UT_DEBUGMSG(("delta:inserted-text-start tid:%s idref:%s\n", ctTextID.c_str(), idref.c_str()));
         UT_DEBUGMSG(("ODTCT ctRevision.addRevision() add rev:%s\n", idref.c_str() ));
+
+        //
+        // When were we added?
+        //
         if( !idref.empty() )
         {
             ctRevision.addRevision( fromChangeID(idref), PP_REVISION_ADDITION );
@@ -974,7 +949,10 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
         {
             ctRevision.addRevision( fromChangeID(ctTextID), PP_REVISION_ADDITION );
         }
-        
+
+        //
+        // When were we deleted?
+        //
         if( const ODi_StartTag* st = m_rElementStack.getClosestElement( "delta:removed-content" ))
         {
             if( const char* v = st->getAttributeValue( "delta:removal-change-idref" ))
@@ -982,7 +960,10 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                 ctRevision.addRevision( fromChangeID(v), PP_REVISION_DELETION );
             }
         }
-        
+
+        //
+        // If we have revision information then append it to the document
+        //
         if( strlen(ctRevision.getXMLstring()) )
         {
             if( strcmp(ctRevision.getXMLstring(),"0"))
@@ -1043,6 +1024,9 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                 UT_uint32 wid = 0;
                 std::string ctMostRecentWritingVersion = ctAddRemoveStackGetLast( PP_REVISION_ADDITION );
                 PP_RevisionAttr ctRevision;
+                //
+                // When were we added?
+                //
                 {
                     const gchar* x = idrefstr;
                     UT_DEBUGMSG(("ODTCT ctRevision.addRevision() t:span add explicit:%s mrw:%s\n",
@@ -1052,6 +1036,9 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                     ctRevision.addRevision( wid, PP_REVISION_ADDITION );
                 }
 
+                //
+                // When were we deleted?
+                //
                 std::string ctMostRecentDeleteVersion = ctAddRemoveStackGetLast( PP_REVISION_DELETION );
                 if( fromChangeID(ctMostRecentDeleteVersion) > wid )
                 {
@@ -1059,22 +1046,34 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                                             PP_REVISION_DELETION );
                 }
 
-                //
-                // multiple nested spans with ac:change intermixed need to be read back into the revision explicitly
-                // this is a little bit tricky because a style might be set in an old revision and then overridden
-                // in a later revision. eg;
-                // <text:span style=bold   idref=2> hi there
-                // <text:span style=italic idref=5> you </text:span>
-                // and more...
-                // the point here is that the abiword <c> span for "you" must have rev=!2{bold},!5{italic} in it.
-                //
+                /*
+                 * multiple nested spans with ac:change intermixed
+                 * need to be read back into the revision explicitly.
+                 * 
+                 * This is a little bit tricky because a style might
+                 * be set in an old revision and then overridden in a
+                 * later revision. For example;
+                 * 
+                 * <text:span style=bold   idref=2> hi there
+                 * <text:span style=italic idref=5> you </text:span>
+                 * and more...
+                 *
+                 * The point here is that the abiword <c> span for
+                 * "you" must have rev=!2{bold},!5{italic} in it
+                 * because the enclosing text:span is still active
+                 * even though it was overriden in revision 5 for the
+                 * "you" span.
+                 *
+                 */
                 {
                     UT_DEBUGMSG(("openspan(style top) spanstack.size:%d\n", m_ctSpanStack.size() ));
 
                     PP_RevisionAttr ra;
+                    //
                     // The revision attribute x will have a series of {version,odt-attr} style
                     // changes in it, we have to translate the ODF text:style-name into abi props
                     // from this intermediate ra during the load...
+                    //
                     ctAddACChangeODFTextStyle( ra, ppAtts, ODi_Office_Styles::StyleText );
 
                     UT_DEBUGMSG(("openspan(acchange done) ra:%s\n", ra.getXMLstring() ));
@@ -1101,6 +1100,7 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                         z.addRevision( ra );
                     }
 
+                    // cleanup what we have found
                     ctSimplifyStyles( ra );
 
                     // Do this at any rate so that the closing span can blindly pop it back
@@ -1109,6 +1109,11 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                     
                     UT_DEBUGMSG(("openspan(2) ra:%s\n", ra.getXMLstring() ));
                     UT_DEBUGMSG(("openspan(2) spanstack.size:%d\n", m_ctSpanStack.size() ));
+                    //
+                    // For everything in the span stack, if the
+                    // revision has style information then merge it
+                    // into ctRevision.
+                    //
                     for( m_ctSpanStack_t::iterator ssi = m_ctSpanStack.begin(); ssi != m_ctSpanStack.end(); ++ssi )
                     {
                         std::string s = *ssi;
@@ -1121,7 +1126,9 @@ ODi_TextContent_ListenerState::startElement( const gchar* pName,
                     UT_DEBUGMSG(("openspan(3) ctRevision:%s\n", ctRevision.getXMLstring() ));
                 }
             
-                
+                //
+                // If we have revision information then append it to the document
+                //
                 if( strcmp( ctRevision.getXMLstring(), "0" ))
                 {
                     UT_DEBUGMSG(("ODTCT start of text:span rev:%s\n", ctRevision.getXMLstring() ));
@@ -1735,12 +1742,14 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
     }
     else if (!strcmp(pName, "delta:remove-leaving-content-start" ))
     {
-        m_ctInsideRemoveLeavingContentStartElement = false;
         UT_DEBUGMSG(("delta:remove-leaving-content-start (end)\n" ));
+
+        m_ctInsideRemoveLeavingContentStartElement = false;
     }
     else if (!strcmp(pName, "delta:remove-leaving-content-end" ))
     {
         UT_DEBUGMSG(("delta:remove-leaving-content-end (end)\n" ));
+
         m_ctRemoveLeavingContentStack.pop_back();
         if( m_ctRemoveLeavingContentStack.empty() )
         {
@@ -1752,6 +1761,7 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
         UT_DEBUGMSG(("delta:merge (end)\n" ));
         UT_DEBUGMSG(("delta:merge (end) charData.sz:%d acceptingText:%d\n",
                      m_charData.size(), m_bAcceptingText ));
+
         m_mergeIDRef = "";
         m_ctRevisionIDBeforeMergeBlock = "";
         m_bAcceptingText = true;
@@ -1761,18 +1771,17 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
         UT_DEBUGMSG(("delta:leading-partial-content (end)\n" ));
 
         // doesn't much matter here if there was actually any text
-        // content in the leading-partial-content (?)
-//        if (m_charData.size () > 0 && m_bAcceptingText)
+        // content in the leading-partial-content
+        //
+        // We get here with the following sort of ODF fragment
+        // <text:p delta:insertion-change-idref="1" >
+        // This is a sample <delta:merge delta:removal-change-idref="2">
+        //   <delta:leading-partial-content>paragraph.</delta:leading-partial-content>
+        //
+        // So we want to mark the end of the text:p as deleted by
+        // Setting the last PTX_Block
+        // revision/ABIATTR_PARA_END_DELETED_REVISION to m_mergeIDRef
         {
-            // We get here with the following sort of ODF fragment
-            // <text:p delta:insertion-change-idref="1" >
-            // This is a sample <delta:merge delta:removal-change-idref="2">
-            //   <delta:leading-partial-content>paragraph.</delta:leading-partial-content>
-            //
-            // So we want to mark the end of the text:p as deleted by
-            // Setting the last PTX_Block
-            // revision/ABIATTR_PARA_END_DELETED_REVISION to m_mergeIDRef
-
             PT_DocPosition epos = 0;
             m_pAbiDocument->getBounds(true,epos);
 
@@ -1781,6 +1790,7 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
             if(!m_pAbiDocument->getStruxOfTypeFromPosition( epos, eStruxType, &sdh ))
             {
                 UT_DEBUGMSG(("ODTCT: loading delta:merge failed to get block! should not happen!\n" ));
+                UT_ASSERT_HARMLESS(UT_SHOULD_NOT_HAPPEN);
             }
             else
             {
@@ -1826,11 +1836,11 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
     }
     else if (!strcmp(pName, "delta:trailing-partial-content" ))
     {
-        m_mergeIsInsideTrailingPartialContent = false;
-
         UT_DEBUGMSG(("delta:trailing-partial-content (end) idbeforeBlock:%s\n", m_ctRevisionIDBeforeMergeBlock.c_str() ));
         UT_DEBUGMSG(("delta:trailing-partial-content (end) charData.sz:%d acceptingText:%d\n",
                      m_charData.size(), m_bAcceptingText ));
+
+        m_mergeIsInsideTrailingPartialContent = false;
     }
     else if (!strcmp(pName, "delta:removed-content"))
     {
@@ -1847,9 +1857,13 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
         m_ctSpanDepth--;
         if( !m_ctSpanDepth )
         {
+            //
+            // Use the AddRemoveStack to add the revision information for when we added
+            // the content we are now removing
+            //
             PP_RevisionAttr ctRevision;
             ctAddRemoveStackSetup( ctRevision, m_ctAddRemoveStack );
-                
+
             if( strcmp( ctRevision.getXMLstring(), "0" ))
             {
                 propertyArray<> ppAtts;
@@ -1867,7 +1881,9 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
         UT_DEBUGMSG(("text:p ending .. m_ctHaveParagraphFmt:%d\n", m_ctHaveParagraphFmt ));
         bool reallyEndParagraph = true;
 
+        //
         // CT: Dont do this if inside intermediate-content
+        //
         if( !m_mergeIDRef.empty() ) 
         {
             UT_DEBUGMSG(("text:p ending inside mergeID:%s\n", m_mergeIDRef.c_str() ));
@@ -1900,10 +1916,10 @@ void ODi_TextContent_ListenerState::endElement (const gchar* pName,
         if( !m_ctSpanStack.empty() )
         {
             //
-            // back() is the current style.
+            // m_ctSpanStack.back() is the current style.
             //
             // Since we are closing a span, we want to pop that style
-            // off and then see what the current "old" style was to
+            // off and then see what the current "old" style was so we can
             // restore things to that old style
             //
             m_ctSpanStack.pop_back();
@@ -2636,39 +2652,31 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         //
         // Handle the ac:changeXXX attribute which stores
         // revision,actype,attr,oldValue
-        // and convert that to the needed format for PP_Revision of
+        // 
+        // Convert attributes from ac:change to the needed format for
+        // PP_Revision, that being:
         // revision,eType,attr,newValue
-        // and setup ctRevision to represent the ac:changeXXX attributes.
+        //
+        // First ra is setup with ctRevision, then the ac:change attributes
+        // are converted into ra too, and ctRevision is set to this combined revattr.
         //
         {
+            
             PP_RevisionAttr ra;
             ra.setRevision( ctRevision.getXMLstring() );
 
-
-            ////
-            // make sure not to map text:style-name into ra here
-            // we handle text:style-name explicitly below, translating to abiword attributes
-            {
-                ODi_ChangeTrackingACChange ct( this );
-                ct.addToAttributesToIgnore( "text:style-name" );
-//                ct.ctAddACChange( ra, ppParagraphAtts );
-            }
-            UT_DEBUGMSG(("openpara(acchange top) ct:%s\n", ctRevision.getXMLstring() ));
             UT_DEBUGMSG(("openpara(acchange top) ra:%s\n", ra.getXMLstring() ));
-
+            UT_DEBUGMSG(("openpara(acchange top) ct:%s\n", ctRevision.getXMLstring() ));
+            UT_DEBUGMSG(("openpara(acchange) m_ctLeadingElementChangedRevision:%s\n",
+                         m_ctLeadingElementChangedRevision.getXMLstring() ));
 
             //
             // Have to map text:style-name back into something that
             // abiword will understand. 
             //
             ctAddACChangeODFTextStyle( ra, ppParagraphAtts, ODi_Office_Styles::StylePara );
-            UT_DEBUGMSG(("openpara(acchange) m_ctLeadingElementChangedRevision:%s\n", m_ctLeadingElementChangedRevision.getXMLstring() ));
-            UT_DEBUGMSG(("openpara(acchange) ra:%s\n", ra.getXMLstring() ));
-
             ctRevision.setRevision(ra.getXMLstring());
-            
-            
-            UT_DEBUGMSG(("ac:changeXXX:%s\n", ra.getXMLstring() ));
+            UT_DEBUGMSG(("openpara(acchange) ctRevision:%s\n", ctRevision.getXMLstring() ));
         }
         
         
@@ -2759,7 +2767,9 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             UT_DEBUGMSG(("para:style:%s\n", pStyle->getDisplayName().utf8_str() ));
         UT_DEBUGMSG(("ctInsertionChangeIDRef:%s\n", ctInsertionChangeIDRef.c_str() ));
 
+        //
         // push the paragraph style onto the revisions
+        //
         if( (pStyle && strlen( pStyle->getDisplayName().utf8_str() ))
             && !ctInsertionChangeIDRef.empty() )
         {
@@ -2975,6 +2985,9 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
             }
 
 
+            //
+            // If the paragraph is deleted then remember that.
+            //
             if( m_ctParagraphDeletedRevision != -1 )
             {
                 UT_DEBUGMSG(("ODTCT ctRevision.addRevision() delparaA rev:%d\n", m_ctParagraphDeletedRevision ));
@@ -2986,7 +2999,10 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
                 
                 UT_DEBUGMSG(("ODTCT ctRevision.addRevision() ctrevB:%s\n", ctRevision.getXMLstring() ));
             }
-            
+
+            //
+            // Add ctRevision to ppAtts if it says anything
+            //
             if( strlen(ctRevision.getXMLstring()) )
             {
                 if( strcmp(ctRevision.getXMLstring(), "0"))
@@ -3031,9 +3047,10 @@ ODi_TextContent_ListenerState::_startParagraphElement( const gchar* /*pName*/,
         }
 
 
-        // handle revision information
+        //
+        // Force a <c> to be generated and handle the revision information for it.
+        //
         {
-            
             std::string ctMostRecentWritingVersion = ctAddRemoveStackGetLast( PP_REVISION_ADDITION );
             PP_RevisionAttr ctRevision;
             {
